@@ -20,7 +20,7 @@ export default function SpeedGauge({
   onStart,
   onCancel
 }) {
-  const active = ![STATES.IDLE, STATES.COMPLETE, STATES.ERROR].includes(state);
+  const active = ![STATES.IDLE, STATES.COMPLETE, STATES.COMPLETED_PARTIAL, STATES.ERROR].includes(state);
   const value = state === STATES.UPLOAD ? metrics.upload : metrics.download;
   const percent = Math.min(value / 10, 100);
   const points = samples.length
@@ -38,7 +38,7 @@ export default function SpeedGauge({
         {PHASE_LABELS[state]}
       </div>
 
-      <div className="gauge">
+      <div className="gauge" aria-live="polite" aria-valuenow={value}>
         <svg viewBox="0 0 240 145" aria-label={`${value} megabits per second`}>
           <path className="gauge-track" d="M25 120 A95 95 0 0 1 215 120" />
           <motion.path

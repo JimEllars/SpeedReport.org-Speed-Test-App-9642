@@ -34,10 +34,26 @@ function App() {
       return;
     }
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const runId = urlParams.get('runId');
+    if (runId) {
+      const foundInHistory = history.find(r => r.id === runId);
+      if (foundInHistory) {
+        setReport(foundInHistory);
+        setIsShared(false);
+        return;
+      } else {
+        // Just show a small native browser toast or warning (or could use an alert for simplicity here if no toast library is available)
+        // using simple console/alert for non-intrusive warning as requested
+        console.warn('Referenced report not found on this device; ready for a new test.');
+        const toast = document.createElement('div'); toast.style = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#f5bc6e;color:#18263c;padding:10px 20px;border-radius:8px;font-size:12px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.2)'; toast.innerText = 'Referenced report not found on this device; ready for a new test.'; document.body.appendChild(toast); setTimeout(() => toast.remove(), 4000);
+      }
+    }
+
     if (latestReport) {
       setReport(latestReport);
     }
-  }, [latestReport]);
+  }, [latestReport, history]);
 
   const handleComplete = useCallback((result) => {
     setReport(result);
