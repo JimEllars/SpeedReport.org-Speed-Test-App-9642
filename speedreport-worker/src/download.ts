@@ -7,7 +7,6 @@ const MAX_BYTES = 100 * 1024 * 1024;
 export function handleDownload(request: Request, url: URL): Response {
   const requested = Number(url.searchParams.get('bytes')) || DEFAULT_BYTES;
   const target = Math.min(Math.max(requested, CHUNK_SIZE), MAX_BYTES);
-  const chunk = new Uint8Array(CHUNK_SIZE);
   let sent = 0;
 
   const stream = new ReadableStream({
@@ -21,9 +20,11 @@ export function handleDownload(request: Request, url: URL): Response {
         return;
       }
       const remaining = target - sent;
-      const output = remaining >= CHUNK_SIZE ? chunk : chunk.slice(0, remaining);
-      controller.enqueue(output);
-      sent += output.byteLength;
+      const size = Math.min(remaining, CHUNK_SIZE);
+      const chunk = new Uint8Array(size);
+      crypto.getRandomValues(chunk);
+      controller.enqueue(chunk);
+      sent += size;
     }
   });
 

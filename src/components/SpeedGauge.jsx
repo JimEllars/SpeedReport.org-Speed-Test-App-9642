@@ -1,3 +1,4 @@
+
 import { motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import * as FiIcons from 'react-icons/fi';
@@ -21,7 +22,7 @@ export default function SpeedGauge({
   onStart,
   onCancel
 }) {
-const active = ![STATES.IDLE, STATES.COMPLETE, STATES.COMPLETED_PARTIAL, STATES.ERROR].includes(state);
+  const active = ![STATES.IDLE, STATES.COMPLETE, STATES.COMPLETED_PARTIAL, STATES.ERROR].includes(state);
   const targetValue = state === STATES.UPLOAD ? metrics.upload : metrics.download;
 
   const [displayValue, setDisplayValue] = useState(targetValue);
@@ -48,8 +49,8 @@ const active = ![STATES.IDLE, STATES.COMPLETE, STATES.COMPLETED_PARTIAL, STATES.
         displayValueRef.current = targetValue;
         setDisplayValue(targetValue);
       } else {
-        // smooth factor
-        const lerpFactor = 1 - Math.exp(-dt * 0.015);
+        // Linear smooth factor
+        const lerpFactor = Math.min(dt / 150, 1);
         const next = current + diff * lerpFactor;
         displayValueRef.current = next;
         setDisplayValue(next);
@@ -67,7 +68,16 @@ const active = ![STATES.IDLE, STATES.COMPLETE, STATES.COMPLETED_PARTIAL, STATES.
   }, [targetValue, active]);
 
   const value = displayValue;
-  const percent = Math.min(value / 10, 100);
+  // Calculate percentage dynamically for non-linear scale up to 1000 Mbps
+  const scaleValue = (val) => {
+    // 0-100 Mbps takes 50% of the gauge
+    // 100-1000 Mbps takes the rest
+    if (val <= 100) return (val / 100) * 50;
+    if (val <= 1000) return 50 + ((val - 100) / 900) * 50;
+    return 100;
+  };
+
+  const percent = scaleValue(value);
   const points = samples.length
     ? samples
       .map((sample, index) => (
@@ -91,7 +101,7 @@ const active = ![STATES.IDLE, STATES.COMPLETE, STATES.COMPLETED_PARTIAL, STATES.
             d="M25 120 A95 95 0 0 1 215 120"
             initial={{ pathLength: 0 }}
             animate={{ pathLength: percent / 100 }}
-            transition={{ duration: 0.45 }}
+            transition={{ type: 'tween', ease: 'linear', duration: 0.05 }}
           />
         </svg>
 

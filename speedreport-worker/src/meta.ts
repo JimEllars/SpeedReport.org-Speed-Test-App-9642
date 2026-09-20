@@ -12,6 +12,7 @@ interface CloudflareRequest extends Request {
     longitude?: string;
     colo?: string;
     httpProtocol?: string;
+    tlsVersion?: string;
   };
 }
 
@@ -27,7 +28,9 @@ export function handleMeta(request: CloudflareRequest): Response {
       postalCode: '',
       latitude: '',
       longitude: '',
-      colo: 'Local'
+      colo: 'Local',
+      httpProtocol: 'HTTP/1.1',
+      tlsVersion: 'unknown'
     }, 200, request);
   }
 
@@ -41,6 +44,8 @@ export function handleMeta(request: CloudflareRequest): Response {
     postalCode: request.cf?.postalCode || '',
     latitude: request.cf?.latitude || '',
     longitude: request.cf?.longitude || '',
-    colo: request.cf?.colo || 'Nearest'
+    colo: request.cf?.colo || 'Nearest',
+    httpProtocol: request.cf?.httpProtocol || 'unknown',
+    tlsVersion: request.cf?.tlsVersion || 'unknown'
   }, 200, request);
 }

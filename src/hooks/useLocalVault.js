@@ -8,7 +8,20 @@ function readReports() {
     const stored = localStorage.getItem(STORAGE_KEY);
     const parsed = stored ? JSON.parse(stored) : [];
 
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+
+    // Backward compatibility for loadedPingDownload / loadedPingUpload
+    return parsed.map(report => {
+      if (report.metrics) {
+        if (report.metrics.loadedPingDownload === undefined) {
+          report.metrics.loadedPingDownload = report.metrics.loadedPing || report.metrics.ping;
+        }
+        if (report.metrics.loadedPingUpload === undefined) {
+          report.metrics.loadedPingUpload = report.metrics.loadedPing || report.metrics.ping;
+        }
+      }
+      return report;
+    });
   } catch {
     return [];
   }
