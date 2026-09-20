@@ -8,12 +8,20 @@ export const cors = {
   'Cache-Control': 'no-store'
 };
 
+interface RequestCfProperties {
+  colo?: string;
+  httpProtocol?: string;
+}
+
+type RequestWithCf = Request & {
+  cf?: RequestCfProperties;
+};
+
 export function telemetryHeaders(request: Request): Record<string, string> {
   const cfRay = request.headers.get('cf-ray') || '';
-  // @ts-ignore
-  const colo = request.cf?.colo || '';
-  // @ts-ignore
-  const httpProtocol = request.cf?.httpProtocol || '';
+  const { cf } = request as RequestWithCf;
+  const colo = cf?.colo || '';
+  const httpProtocol = cf?.httpProtocol || '';
 
   const headers: Record<string, string> = {
     'Server-Timing': `edge;dur=0;desc="${colo}"`
