@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { PHASE_LABELS, STATES } from '../common/testConstants';
@@ -20,8 +21,52 @@ export default function SpeedGauge({
   onStart,
   onCancel
 }) {
-  const active = ![STATES.IDLE, STATES.COMPLETE, STATES.COMPLETED_PARTIAL, STATES.ERROR].includes(state);
-  const value = state === STATES.UPLOAD ? metrics.upload : metrics.download;
+const active = ![STATES.IDLE, STATES.COMPLETE, STATES.COMPLETED_PARTIAL, STATES.ERROR].includes(state);
+  const targetValue = state === STATES.UPLOAD ? metrics.upload : metrics.download;
+
+  const [displayValue, setDisplayValue] = useState(targetValue);
+  const displayValueRef = useRef(displayValue);
+  const animationRef = useRef(null);
+
+  useEffect(() => {
+    if (!active) {
+      setDisplayValue(targetValue);
+      displayValueRef.current = targetValue;
+      return;
+    }
+
+    let lastTime = performance.now();
+
+    const animate = (time) => {
+      const dt = time - lastTime;
+      lastTime = time;
+
+      const current = displayValueRef.current;
+      const diff = targetValue - current;
+
+      if (Math.abs(diff) < 0.1) {
+        displayValueRef.current = targetValue;
+        setDisplayValue(targetValue);
+      } else {
+        // smooth factor
+        const lerpFactor = 1 - Math.exp(-dt * 0.015);
+        const next = current + diff * lerpFactor;
+        displayValueRef.current = next;
+        setDisplayValue(next);
+        animationRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [targetValue, active]);
+
+  const value = displayValue;
   const percent = Math.min(value / 10, 100);
   const points = samples.length
     ? samples

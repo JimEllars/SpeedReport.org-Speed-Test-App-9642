@@ -1,6 +1,7 @@
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { downloadHistoryCsv } from '../utils/reportActions';
+import { downloadJsonReport } from '../utils/reportActions';
 import './TestHistoryVault.css';
 
 const {
@@ -29,6 +30,23 @@ export default function TestHistoryVault({ history, onClear, onSelect }) {
     1
   );
 
+
+  const exportHistoryJson = () => {
+    try {
+      const content = JSON.stringify(history, null, 2);
+      const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `SpeedReport-history-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      // Browser download permissions can block this action.
+    }
+  };
+
   const exportHistory = () => {
     try {
       downloadHistoryCsv(history);
@@ -47,6 +65,10 @@ export default function TestHistoryVault({ history, onClear, onSelect }) {
 
         {history.length > 0 && (
           <div className="history-actions">
+            <button className="icon-button" onClick={exportHistoryJson}>
+              <SafeIcon icon={FiDownload} />
+              JSON
+            </button>
             <button className="icon-button" onClick={exportHistory}>
               <SafeIcon icon={FiDownload} />
               CSV

@@ -42,7 +42,7 @@ export async function measurePing(samples = 10, signal) {
     const started = performance.now();
 
     try {
-      const response = await fetch(endpoint('/api/ping'), {
+      const response = await fetch(endpoint('/api/meta'), {
         ...requestOptions(signal),
         signal: signal || AbortSignal.timeout(5000)
       });
@@ -285,7 +285,7 @@ export async function measureLoadedPing(durationMs = 3500, signal) {
     const pingStarted = performance.now();
 
     try {
-      const response = await fetch(endpoint('/api/ping'), {
+      const response = await fetch(endpoint('/api/meta'), {
         ...requestOptions(signal),
         signal: signal || AbortSignal.timeout(5000)
       });

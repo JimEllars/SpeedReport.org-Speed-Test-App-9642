@@ -1,8 +1,8 @@
 import { cors, telemetryHeaders } from './http';
 
 const CHUNK_SIZE = 64 * 1024;
-const DEFAULT_BYTES = 10 * 1024 * 1024;
-const MAX_BYTES = 50 * 1024 * 1024;
+const DEFAULT_BYTES = 25 * 1024 * 1024;
+const MAX_BYTES = 100 * 1024 * 1024;
 
 export function handleDownload(request: Request, url: URL): Response {
   const requested = Number(url.searchParams.get('bytes')) || DEFAULT_BYTES;
@@ -12,6 +12,10 @@ export function handleDownload(request: Request, url: URL): Response {
 
   const stream = new ReadableStream({
     pull(controller) {
+      if (request.signal.aborted) {
+        controller.close();
+        return;
+      }
       if (sent >= target) {
         controller.close();
         return;
