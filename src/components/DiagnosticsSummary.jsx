@@ -40,7 +40,7 @@ export default function DiagnosticsSummary({ report }) {
       icon: FiTrendingUp,
       label: 'Loaded latency delta',
       value: `+${loadedDelta} ms`,
-      detail: `${metrics.loadedPing} ms average while saturated`,
+      detail: `DL: ${metrics.loadedPingDownload} ms / UL: ${metrics.loadedPingUpload} ms`,
       state: loadedStatus
     },
     {

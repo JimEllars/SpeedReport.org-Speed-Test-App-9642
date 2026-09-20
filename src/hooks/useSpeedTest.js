@@ -1,10 +1,10 @@
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { STATES } from '../common/testConstants';
 import {
   bufferGrade,
   fetchMeta,
   measureDownload,
-  measureLoadedPing,
   measurePing,
   measureUpload
 } from '../utils/benchmarkEngine';
@@ -18,6 +18,8 @@ const initialMetrics = {
   loss: 0,
   min: 0,
   max: 0,
+  loadedPingDownload: 0,
+  loadedPingUpload: 0,
   loadedPing: 0,
   loadedJitter: 0,
   loadedLoss: 0,
@@ -79,35 +81,39 @@ export function useSpeedTest(onComplete) {
       setMetrics((current) => ({ ...current, ...idle }));
 
       setState(STATES.DOWNLOAD);
-      const download = await measureDownload(
+      const dlRes = await measureDownload(
         (value) => updateLive('download', value),
         controller.signal
       );
-      setMetrics((current) => ({ ...current, download }));
+      setMetrics((current) => ({ ...current, download: dlRes.bandwidth }));
 
       setState(STATES.UPLOAD);
-      const upload = await measureUpload(
+      setSamples([]); // Reset samples for upload
+      const ulRes = await measureUpload(
         (value) => updateLive('upload', value),
         controller.signal
       );
-      setMetrics((current) => ({ ...current, upload }));
+      setMetrics((current) => ({ ...current, upload: ulRes.bandwidth }));
 
-      setState(STATES.BUFFERBLOAT);
-      const loaded = await measureLoadedPing(3500, controller.signal);
-      const delta = Math.max(0, loaded.ping - idle.ping);
+      const pings = [dlRes.loadedPing, ulRes.loadedPing].filter((p) => p !== null);
+      const maxLoadedPing = pings.length > 0 ? Math.max(...pings) : idle.ping;
+      const loadedPing = pings.length > 0 ? (pings.reduce((a,b)=>a+b,0)/pings.length) : idle.ping;
+      const delta = Math.max(0, maxLoadedPing - idle.ping);
 
       const completeMetrics = {
         ...idle,
-        download,
-        upload,
-        loadedPing: loaded.ping,
-        loadedJitter: loaded.jitter,
-        loadedLoss: loaded.loss,
+        download: dlRes.bandwidth,
+        upload: ulRes.bandwidth,
+        loadedPingDownload: dlRes.loadedPing || idle.ping,
+        loadedPingUpload: ulRes.loadedPing || idle.ping,
+        loadedPing: loadedPing,
+        loadedJitter: 0,
+        loadedLoss: 0,
         bufferbloat: bufferGrade(delta)
       };
 
       let partialFailure = false;
-      if (!download || !upload) {
+      if (!dlRes.bandwidth || !ulRes.bandwidth) {
         partialFailure = true;
       }
 

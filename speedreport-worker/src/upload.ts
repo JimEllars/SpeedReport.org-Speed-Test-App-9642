@@ -12,6 +12,7 @@ export async function handleUpload(request: Request): Promise<Response> {
   let receivedBytes = 0;
 
   try {
+    // Read and immediately discard body to avoid memory accumulation
     const reader = request.body.getReader();
     while (true) {
       if (request.signal.aborted) {

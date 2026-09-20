@@ -4,7 +4,7 @@ export const STATES = {
   PING: 'PING_TEST',
   DOWNLOAD: 'DOWNLOAD_TEST',
   UPLOAD: 'UPLOAD_TEST',
-  BUFFERBLOAT: 'BUFFERBLOAT_TEST',
+
   COMPLETE: 'COMPLETED',
   COMPLETED_PARTIAL: 'COMPLETED_PARTIAL',
   ERROR: 'ERROR'
@@ -15,7 +15,7 @@ export const PHASE_LABELS = {
   PING_TEST: 'Measuring latency',
   DOWNLOAD_TEST: 'Testing download',
   UPLOAD_TEST: 'Testing upload',
-  BUFFERBLOAT_TEST: 'Analyzing connection quality',
+
   COMPLETED: 'Assessment complete',
   COMPLETED_PARTIAL: 'Assessment partially complete',
   ERROR: 'Test interrupted'
