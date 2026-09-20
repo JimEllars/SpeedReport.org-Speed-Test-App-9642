@@ -1,0 +1,114 @@
+.share-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 23px 25px;
+  border: 1px solid #26364e;
+  border-radius: 18px;
+  background: rgba(15, 22, 34, .72);
+}
+
+.share-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.share-card-heading h2 {
+  margin-top: 5px;
+  font: 700 18px 'Manrope';
+}
+
+.share-card-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  color: #7eadff;
+  background: rgba(48, 116, 229, .16);
+}
+
+.share-card p {
+  max-width: 720px;
+  color: #77869b;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.share-link-row {
+  display: flex;
+  gap: 8px;
+}
+
+.share-link-row input {
+  min-width: 0;
+  flex: 1;
+  padding: 12px 13px;
+  border: 1px solid #29384e;
+  border-radius: 9px;
+  outline: none;
+  color: #a9c6f7;
+  background: #0a111d;
+  font: 10px monospace;
+}
+
+.share-link-row input:focus {
+  border-color: #397bea;
+}
+
+.share-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  color: #fff;
+  background: #286ddd;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.share-action.secondary {
+  color: #9cb3d6;
+  background: #182438;
+}
+
+.share-action:hover {
+  filter: brightness(1.12);
+}
+
+.share-error {
+  color: #f5bc6e;
+  font-size: 10px;
+}
+
+.return-link {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  color: #719bea;
+  background: transparent;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+@media (max-width: 620px) {
+  .share-link-row {
+    flex-direction: column;
+  }
+
+  .share-link-row input {
+    width: 100%;
+    min-height: 39px;
+  }
+
+  .share-action {
+    min-height: 39px;
+  }
+}

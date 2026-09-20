@@ -1,0 +1,72 @@
+import { motion } from 'framer-motion';
+import * as FiIcons from 'react-icons/fi';
+import SafeIcon from '../common/SafeIcon';
+import { PHASE_LABELS, STATES } from '../common/testConstants';
+
+const { FiPlay, FiRefreshCw } = FiIcons;
+
+function formatSpeed(value) {
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(2)} Gbps`;
+  }
+
+  return `${value.toFixed(1)} Mbps`;
+}
+
+export default function SpeedGauge({ state, metrics, samples, onStart }) {
+  const active = ![STATES.IDLE, STATES.COMPLETE, STATES.ERROR].includes(state);
+  const value = state === STATES.UPLOAD ? metrics.upload : metrics.download;
+  const percent = Math.min(value / 10, 100);
+  const points = samples.length
+    ? samples
+      .map((sample, index) => (
+        `${(index / Math.max(samples.length - 1, 1)) * 280},${55 - Math.min(sample / 20, 48)}`
+      ))
+      .join(' ')
+    : '0,54 280,54';
+
+  return (
+    <section className="gauge-card">
+      <div className="status-line">
+        <span className={active ? 'pulse-dot active' : 'pulse-dot'} />
+        {PHASE_LABELS[state]}
+      </div>
+
+      <div className="gauge">
+        <svg viewBox="0 0 240 145" aria-label={`${value} megabits per second`}>
+          <path className="gauge-track" d="M25 120 A95 95 0 0 1 215 120" />
+          <motion.path
+            className="gauge-progress"
+            d="M25 120 A95 95 0 0 1 215 120"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: percent / 100 }}
+            transition={{ duration: 0.45 }}
+          />
+        </svg>
+
+        <div className="gauge-value">
+          <strong>{value.toFixed(1)}</strong>
+          <span>{formatSpeed(value).split(' ').slice(1).join(' ') || 'Mbps'}</span>
+          <small>{state === STATES.UPLOAD ? 'UPLOAD' : 'DOWNLOAD'}</small>
+        </div>
+      </div>
+
+      <svg className="sparkline" viewBox="0 0 280 60" preserveAspectRatio="none">
+        <polyline points={points} />
+      </svg>
+
+      <button className="primary-button" onClick={onStart} disabled={active}>
+        <SafeIcon icon={state === STATES.IDLE ? FiPlay : FiRefreshCw} />
+        {active
+          ? 'Diagnostic in progress'
+          : state === STATES.IDLE
+            ? 'Start speed test'
+            : 'Run test again'}
+      </button>
+
+      <p className="test-note">
+        Uses multiple edge streams and approximately 60 MB of test traffic.
+      </p>
+    </section>
+  );
+}
