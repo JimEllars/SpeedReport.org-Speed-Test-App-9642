@@ -34,27 +34,18 @@ export function useLocalVault() {
         setStorageUsagePercent(Math.round((next.length / MAX_HISTORY) * 100));
         return next;
       } catch (error) {
-        if (error.name === 'QuotaExceededError') {
-          // Prune oldest non-favorited runs
-          // Assuming 'favorited' property exists, else just prune oldest
-          let pruned = next;
-          while (pruned.length > 0) {
-            const indexToRemove = pruned.findLastIndex(r => !r.favorited) !== -1
-              ? pruned.findLastIndex(r => !r.favorited)
-              : pruned.length - 1;
-
-            pruned = [...pruned.slice(0, indexToRemove), ...pruned.slice(indexToRemove + 1)];
-
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
-              setStorageUsagePercent(Math.round((pruned.length / MAX_HISTORY) * 100));
-              return pruned;
-            } catch (e) {
-              if (e.name !== 'QuotaExceededError') break;
-            }
+        if (error.name === 'QuotaExceededError' || error.code === 22) {
+          const pruned = next.slice(0, next.length - 1);
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
+            setStorageUsagePercent(Math.round((pruned.length / MAX_HISTORY) * 100));
+            return pruned;
+          } catch (e) {
+            // Give up gracefully
+            return current;
           }
         }
-        return next;
+        return current;
       }
     });
   }, []);

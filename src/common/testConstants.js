@@ -1,4 +1,4 @@
-export const API_BASE = import.meta.env.VITE_API_BASE || '';
+export const API_BASE = import.meta.env.VITE_SPEED_TEST_WORKER_URL || import.meta.env.VITE_API_BASE || '';
 export const STATES = {
   IDLE: 'IDLE',
   PING: 'PING_TEST',

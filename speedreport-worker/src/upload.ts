@@ -9,21 +9,33 @@ export async function handleUpload(request: Request): Promise<Response> {
   }
 
   const started = Date.now();
-  const reader = request.body.getReader();
   let receivedBytes = 0;
 
   try {
+    const reader = request.body.getReader();
     while (true) {
+      if (request.signal.aborted) {
+        break;
+      }
       const { done, value } = await reader.read();
       if (done) break;
-      receivedBytes += value.byteLength;
+      if (value) {
+        receivedBytes += value.byteLength;
+      }
     }
-  } finally {
     reader.releaseLock();
+  } catch (err) {
+    // ignore
   }
 
-  return json({
+  const durationMs = Math.max(Date.now() - started, 1);
+  const response = json({
     receivedBytes,
-    durationMs: Math.max(Date.now() - started, 1)
+    durationMs
   }, 200, request);
+
+  response.headers.set('X-Received-Bytes', String(receivedBytes));
+  response.headers.set('X-Duration-Ms', String(durationMs));
+
+  return response;
 }
