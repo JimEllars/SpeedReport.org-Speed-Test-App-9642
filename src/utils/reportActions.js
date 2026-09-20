@@ -2,18 +2,81 @@ function createDownloadUrl(content, type) {
   return URL.createObjectURL(new Blob([content], { type }));
 }
 
-export function downloadJsonReport(report) {
-  const content = JSON.stringify(report, null, 2);
-  const url = createDownloadUrl(content, 'application/json');
+function triggerDownload(content, type, filename) {
+  const url = createDownloadUrl(content, type);
   const anchor = document.createElement('a');
 
   anchor.href = url;
-  anchor.download = `SpeedReport-${report.id}.json`;
+  anchor.download = filename;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
 
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function downloadJsonReport(report) {
+  const content = JSON.stringify(report, null, 2);
+
+  triggerDownload(
+    content,
+    'application/json',
+    `SpeedReport-${report.id}.json`
+  );
+}
+
+function escapeCsvValue(value) {
+  const text = String(value ?? '');
+
+  if (/[",\n]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  return text;
+}
+
+export function downloadHistoryCsv(history) {
+  const headers = [
+    'Report ID',
+    'Timestamp',
+    'Provider',
+    'Download Mbps',
+    'Upload Mbps',
+    'Idle Latency ms',
+    'Jitter ms',
+    'Loaded Latency ms',
+    'Loaded Jitter ms',
+    'Packet Loss %',
+    'Loaded Packet Loss %',
+    'Bufferbloat',
+    'Readiness'
+  ];
+
+  const rows = history.map((report) => [
+    report.id,
+    report.timestamp,
+    report.meta?.isp || 'Unknown',
+    report.metrics.download,
+    report.metrics.upload,
+    report.metrics.ping,
+    report.metrics.jitter,
+    report.metrics.loadedPing,
+    report.metrics.loadedJitter,
+    report.metrics.loss,
+    report.metrics.loadedLoss,
+    report.metrics.bufferbloat,
+    report.readiness || 'Not recorded'
+  ]);
+
+  const content = [headers, ...rows]
+    .map((row) => row.map(escapeCsvValue).join(','))
+    .join('\n');
+
+  triggerDownload(
+    content,
+    'text/csv;charset=utf-8',
+    `SpeedReport-history-${new Date().toISOString().slice(0, 10)}.csv`
+  );
 }
 
 function addText(documentRef, parent, tag, text, className = '') {
@@ -138,7 +201,9 @@ export function printReport(report) {
         ['Loaded latency', `${report.metrics.loadedPing} ms`],
         ['Loaded jitter', `${report.metrics.loadedJitter} ms`],
         ['Packet loss', `${report.metrics.loss}%`],
-        ['Bufferbloat', report.metrics.bufferbloat]
+        ['Loaded packet loss', `${report.metrics.loadedLoss}%`],
+        ['Bufferbloat', report.metrics.bufferbloat],
+        ['Readiness', report.readiness || 'Not recorded']
       ]
     }
   ];

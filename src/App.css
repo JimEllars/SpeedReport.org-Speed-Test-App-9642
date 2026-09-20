@@ -284,6 +284,15 @@ main {
   transform: none;
 }
 
+.cancel-button {
+  color: #ffd6d6;
+  background: linear-gradient(135deg, #8f2e45, #b13c50);
+}
+
+.cancel-button:hover {
+  background: linear-gradient(135deg, #a33750, #c54b5d);
+}
+
 .test-note {
   margin-top: 13px;
   color: #59667a;

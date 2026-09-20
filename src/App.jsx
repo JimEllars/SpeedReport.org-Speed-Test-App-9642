@@ -9,6 +9,7 @@ import BusinessAuditCard from './components/BusinessAuditCard';
 import TestHistoryVault from './components/TestHistoryVault';
 import ReportCard from './components/ReportCard';
 import ReportShareCard from './components/ReportShareCard';
+import ReportComparisonCard from './components/ReportComparisonCard';
 import DiagnosticsSummary from './components/DiagnosticsSummary';
 import { useLocalVault } from './hooks/useLocalVault';
 import { useSpeedTest } from './hooks/useSpeedTest';
@@ -44,10 +45,23 @@ function App() {
     save(result);
   }, [save]);
 
+  const handleSelectReport = useCallback((selectedReport) => {
+    setReport(selectedReport);
+    setIsShared(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  const handleClearHistory = useCallback(() => {
+    if (window.confirm('Clear all locally saved reports from this device?')) {
+      clear();
+    }
+  }, [clear]);
+
   const test = useSpeedTest(handleComplete);
   const complete = test.state === STATES.COMPLETE;
   const displayedMetrics = report?.metrics || test.metrics;
-  const displayedMeta = test.meta || report?.meta;
+  const displayedMeta = report?.meta || test.meta;
+  const previousReport = history.find((item) => item.id !== report?.id);
 
   return (
     <div className="app-shell">
@@ -70,13 +84,17 @@ function App() {
         </section>
 
         <div className="dashboard-grid">
-          <SpeedGauge {...test} onStart={test.start} />
+          <SpeedGauge
+            {...test}
+            onStart={test.start}
+            onCancel={test.cancel}
+          />
 
           <div className="metrics-column">
             <MetricsGrid metrics={test.metrics} />
 
             {test.error && (
-              <div className="error-banner">
+              <div className="error-banner" role="alert">
                 <strong>Edge engine unavailable.</strong> {test.error} Deploy the
                 included Worker or configure <code>VITE_API_BASE</code>.
               </div>
@@ -88,6 +106,10 @@ function App() {
 
         <ReportCard report={report} />
         <ReportShareCard report={report} isShared={isShared} />
+        <ReportComparisonCard
+          currentReport={report}
+          previousReport={previousReport}
+        />
         <DiagnosticsSummary report={report} />
 
         <div className="lower-grid">
@@ -95,7 +117,11 @@ function App() {
             metrics={displayedMetrics}
             complete={complete || Boolean(report)}
           />
-          <TestHistoryVault history={history} onClear={clear} />
+          <TestHistoryVault
+            history={history}
+            onClear={handleClearHistory}
+            onSelect={handleSelectReport}
+          />
         </div>
       </main>
 

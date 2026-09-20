@@ -1,0 +1,30 @@
+.history-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.history-view {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: #719bea;
+  background: transparent;
+  cursor: pointer;
+}
+
+.history-view:hover {
+  color: #b6d0ff;
+  background: rgba(71, 126, 229, .14);
+}
+
+.history-footnote {
+  margin-top: 15px;
+  color: #56667c;
+  font-size: 10px;
+  line-height: 1.5;
+}

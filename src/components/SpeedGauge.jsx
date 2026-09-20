@@ -3,7 +3,7 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { PHASE_LABELS, STATES } from '../common/testConstants';
 
-const { FiPlay, FiRefreshCw } = FiIcons;
+const { FiPlay, FiRefreshCw, FiStopCircle } = FiIcons;
 
 function formatSpeed(value) {
   if (value >= 1000) {
@@ -13,7 +13,13 @@ function formatSpeed(value) {
   return `${value.toFixed(1)} Mbps`;
 }
 
-export default function SpeedGauge({ state, metrics, samples, onStart }) {
+export default function SpeedGauge({
+  state,
+  metrics,
+  samples,
+  onStart,
+  onCancel
+}) {
   const active = ![STATES.IDLE, STATES.COMPLETE, STATES.ERROR].includes(state);
   const value = state === STATES.UPLOAD ? metrics.upload : metrics.download;
   const percent = Math.min(value / 10, 100);
@@ -51,18 +57,34 @@ export default function SpeedGauge({ state, metrics, samples, onStart }) {
         </div>
       </div>
 
-      <svg className="sparkline" viewBox="0 0 280 60" preserveAspectRatio="none">
+      <svg
+        className="sparkline"
+        viewBox="0 0 280 60"
+        preserveAspectRatio="none"
+        aria-label="Live speed samples"
+      >
         <polyline points={points} />
       </svg>
 
-      <button className="primary-button" onClick={onStart} disabled={active}>
-        <SafeIcon icon={state === STATES.IDLE ? FiPlay : FiRefreshCw} />
-        {active
-          ? 'Diagnostic in progress'
-          : state === STATES.IDLE
-            ? 'Start speed test'
-            : 'Run test again'}
-      </button>
+      {active ? (
+        <button
+          className="primary-button cancel-button"
+          onClick={onCancel}
+          type="button"
+        >
+          <SafeIcon icon={FiStopCircle} />
+          Stop diagnostic
+        </button>
+      ) : (
+        <button
+          className="primary-button"
+          onClick={onStart}
+          type="button"
+        >
+          <SafeIcon icon={state === STATES.IDLE ? FiPlay : FiRefreshCw} />
+          {state === STATES.IDLE ? 'Start speed test' : 'Run test again'}
+        </button>
+      )}
 
       <p className="test-note">
         Uses multiple edge streams and approximately 60 MB of test traffic.

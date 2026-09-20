@@ -1,30 +1,58 @@
 import { API_BASE } from '../common/testConstants';
 
 const round = (value, digits = 1) => Number(value.toFixed(digits));
-const endpoint = (path, params = '') => `${API_BASE}${path}${params}${params ? '&' : '?'}t=${Date.now()}`;
 
-export async function fetchMeta() {
-  const response = await fetch(endpoint('/api/meta'));
-  if (!response.ok) throw new Error('Metadata service unavailable');
+const endpoint = (path, params = '') =>
+  `${API_BASE}${path}${params}${params ? '&' : '?'}t=${Date.now()}`;
+
+function requestOptions(signal) {
+  return {
+    cache: 'no-store',
+    signal
+  };
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) {
+    throw new DOMException('The diagnostic was cancelled.', 'AbortError');
+  }
+}
+
+export async function fetchMeta(signal) {
+  const response = await fetch(endpoint('/api/meta'), requestOptions(signal));
+
+  if (!response.ok) {
+    throw new Error('Metadata service unavailable');
+  }
+
   return response.json();
 }
 
-export async function measurePing(samples = 10) {
+export async function measurePing(samples = 10, signal) {
   const readings = [];
   let lost = 0;
 
   for (let index = 0; index < samples; index += 1) {
+    throwIfAborted(signal);
+
     const started = performance.now();
 
     try {
       const response = await fetch(endpoint('/api/ping'), {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(5000)
+        ...requestOptions(signal),
+        signal: signal || AbortSignal.timeout(5000)
       });
 
-      if (!response.ok) throw new Error('Ping failed');
+      if (!response.ok) {
+        throw new Error('Ping failed');
+      }
+
       readings.push(performance.now() - started);
-    } catch {
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw error;
+      }
+
       lost += 1;
     }
   }
@@ -48,10 +76,11 @@ export async function measurePing(samples = 10) {
   };
 }
 
-async function consumeDownload(bytes, onBytes) {
-  const response = await fetch(endpoint('/api/download', `?bytes=${bytes}`), {
-    cache: 'no-store'
-  });
+async function consumeDownload(bytes, onBytes, signal) {
+  const response = await fetch(
+    endpoint('/api/download', `?bytes=${bytes}`),
+    requestOptions(signal)
+  );
 
   if (!response.ok || !response.body) {
     throw new Error('Download endpoint unavailable');
@@ -60,18 +89,27 @@ async function consumeDownload(bytes, onBytes) {
   const reader = response.body.getReader();
   let received = 0;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      throwIfAborted(signal);
 
-    received += value.byteLength;
-    onBytes(value.byteLength);
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      received += value.byteLength;
+      onBytes(value.byteLength);
+    }
+  } finally {
+    reader.releaseLock();
   }
 
   return received;
 }
 
-export async function measureDownload(onProgress = () => {}) {
+export async function measureDownload(onProgress = () => {}, signal) {
   const started = performance.now();
   let totalBytes = 0;
 
@@ -83,37 +121,46 @@ export async function measureDownload(onProgress = () => {}) {
   };
 
   await Promise.all(
-    Array.from({ length: 4 }, () => consumeDownload(
-      12 * 1024 * 1024,
-      recordBytes
-    ))
+    Array.from({ length: 4 }, () =>
+      consumeDownload(12 * 1024 * 1024, recordBytes, signal)
+    )
   );
 
   return round(
-    (totalBytes * 8) / Math.max((performance.now() - started) / 1000, 0.1) / 1e6
+    (totalBytes * 8) /
+      Math.max((performance.now() - started) / 1000, 0.1) /
+      1e6
   );
 }
 
 function createUploadPayload(size) {
   const payload = new Uint8Array(size);
   const randomBlock = new Uint8Array(65536);
+
   crypto.getRandomValues(randomBlock);
 
   for (let offset = 0; offset < payload.length; offset += randomBlock.length) {
-    payload.set(randomBlock.subarray(0, Math.min(randomBlock.length, payload.length - offset)), offset);
+    payload.set(
+      randomBlock.subarray(
+        0,
+        Math.min(randomBlock.length, payload.length - offset)
+      ),
+      offset
+    );
   }
 
   return payload;
 }
 
-async function uploadPayload(payload) {
+async function uploadPayload(payload, signal) {
   const response = await fetch(endpoint('/api/upload'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/octet-stream',
       'Cache-Control': 'no-store'
     },
-    body: payload
+    body: payload,
+    signal
   });
 
   if (!response.ok) {
@@ -123,71 +170,91 @@ async function uploadPayload(payload) {
   return payload.byteLength;
 }
 
-export async function measureUpload(onProgress = () => {}) {
+export async function measureUpload(onProgress = () => {}, signal) {
   const payload = createUploadPayload(4 * 1024 * 1024);
   const started = performance.now();
   let completedBytes = 0;
 
   const streams = Array.from({ length: 4 }, async () => {
-    const bytes = await uploadPayload(payload);
+    const bytes = await uploadPayload(payload, signal);
+
     completedBytes += bytes;
 
     const seconds = Math.max((performance.now() - started) / 1000, 0.1);
     onProgress(round((completedBytes * 8) / seconds / 1e6));
+
     return bytes;
   });
 
   await Promise.all(streams);
 
   return round(
-    (completedBytes * 8) / Math.max((performance.now() - started) / 1000, 0.1) / 1e6
+    (completedBytes * 8) /
+      Math.max((performance.now() - started) / 1000, 0.1) /
+      1e6
   );
 }
 
-async function runBackgroundDownload() {
+async function runBackgroundDownload(signal) {
   try {
     await Promise.all(
-      Array.from({ length: 2 }, () => consumeDownload(6 * 1024 * 1024, () => {}))
+      Array.from({ length: 2 }, () =>
+        consumeDownload(6 * 1024 * 1024, () => {}, signal)
+      )
     );
-  } catch {
-    // The ping sample still provides useful information if load traffic fails.
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw error;
+    }
   }
 }
 
-async function runBackgroundUpload() {
+async function runBackgroundUpload(signal) {
   try {
     const payload = createUploadPayload(2 * 1024 * 1024);
+
     await Promise.all([
-      uploadPayload(payload),
-      uploadPayload(payload)
+      uploadPayload(payload, signal),
+      uploadPayload(payload, signal)
     ]);
-  } catch {
-    // The ping sample still provides useful information if load traffic fails.
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw error;
+    }
   }
 }
 
-export async function measureLoadedPing(durationMs = 3500) {
+export async function measureLoadedPing(durationMs = 3500, signal) {
   const started = performance.now();
   const readings = [];
   let lost = 0;
 
   const loadPromise = Promise.all([
-    runBackgroundDownload(),
-    runBackgroundUpload()
+    runBackgroundDownload(signal),
+    runBackgroundUpload(signal)
   ]);
 
   while (performance.now() - started < durationMs) {
+    throwIfAborted(signal);
+
     const pingStarted = performance.now();
 
     try {
       const response = await fetch(endpoint('/api/ping'), {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(5000)
+        ...requestOptions(signal),
+        signal: signal || AbortSignal.timeout(5000)
       });
 
-      if (!response.ok) throw new Error('Loaded ping failed');
+      if (!response.ok) {
+        throw new Error('Loaded ping failed');
+      }
+
       readings.push(performance.now() - pingStarted);
-    } catch {
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw error;
+      }
+
       lost += 1;
     }
   }
