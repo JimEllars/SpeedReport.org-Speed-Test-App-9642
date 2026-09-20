@@ -14,7 +14,7 @@
     "@questlabs/react-sdk": "^2.2.92",
     "@supabase/supabase-js": "^2.39.0",
     "date-fns": "4.1.0",
-    "echarts": "^5.5.0",
+    "echarts": "^6.1.0",
     "echarts-for-react": "^3.0.2",
     "framer-motion": "^11.0.8",
     "pdf-lib": "^1.17.1",
