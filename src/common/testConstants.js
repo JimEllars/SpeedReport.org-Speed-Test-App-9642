@@ -6,6 +6,7 @@ export const STATES = {
   UPLOAD: 'UPLOAD_TEST',
   BUFFERBLOAT: 'BUFFERBLOAT_TEST',
   COMPLETE: 'COMPLETED',
+  COMPLETED_PARTIAL: 'COMPLETED_PARTIAL',
   ERROR: 'ERROR'
 };
 
@@ -16,5 +17,6 @@ export const PHASE_LABELS = {
   UPLOAD_TEST: 'Testing upload',
   BUFFERBLOAT_TEST: 'Analyzing connection quality',
   COMPLETED: 'Assessment complete',
+  COMPLETED_PARTIAL: 'Assessment partially complete',
   ERROR: 'Test interrupted'
 };

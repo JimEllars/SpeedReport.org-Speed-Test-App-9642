@@ -5,7 +5,7 @@ export async function handleUpload(request: Request): Promise<Response> {
     return json({
       receivedBytes: 0,
       durationMs: 0
-    });
+    }, 200, request);
   }
 
   const started = Date.now();
@@ -25,5 +25,5 @@ export async function handleUpload(request: Request): Promise<Response> {
   return json({
     receivedBytes,
     durationMs: Math.max(Date.now() - started, 1)
-  });
+  }, 200, request);
 }

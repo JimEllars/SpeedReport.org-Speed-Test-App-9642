@@ -8,6 +8,7 @@ interface CloudflareRequest extends Request {
     region?: string;
     country?: string;
     colo?: string;
+    httpProtocol?: string;
   };
 }
 
@@ -20,5 +21,5 @@ export function handleMeta(request: CloudflareRequest): Response {
     region: request.cf?.region || '',
     country: request.cf?.country || 'US',
     colo: request.cf?.colo || 'Nearest'
-  });
+  }, 200, request);
 }

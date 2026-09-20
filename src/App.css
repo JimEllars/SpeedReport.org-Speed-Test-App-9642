@@ -783,6 +783,20 @@ footer strong {
 }
 
 @media (max-width: 620px) {
+  .metrics-grid,
+  .diagnostic-grid {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 8px;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(140px, 1fr);
+  }
+  .diagnostic-item,
+  .metric-card {
+    scroll-snap-align: start;
+  }
+
   .app-shell {
     width: min(100% - 28px, 1320px);
   }

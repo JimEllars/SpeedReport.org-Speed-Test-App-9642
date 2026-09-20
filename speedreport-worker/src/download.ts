@@ -1,10 +1,10 @@
-import { cors } from './http';
+import { cors, telemetryHeaders } from './http';
 
 const CHUNK_SIZE = 64 * 1024;
 const DEFAULT_BYTES = 10 * 1024 * 1024;
 const MAX_BYTES = 50 * 1024 * 1024;
 
-export function handleDownload(url: URL): Response {
+export function handleDownload(request: Request, url: URL): Response {
   const requested = Number(url.searchParams.get('bytes')) || DEFAULT_BYTES;
   const target = Math.min(Math.max(requested, CHUNK_SIZE), MAX_BYTES);
   const chunk = new Uint8Array(CHUNK_SIZE);
@@ -26,6 +26,7 @@ export function handleDownload(url: URL): Response {
   return new Response(stream, {
     headers: {
       ...cors,
+      ...telemetryHeaders(request),
       'Content-Type': 'application/octet-stream',
       'Content-Length': String(target),
       'Content-Encoding': 'identity'

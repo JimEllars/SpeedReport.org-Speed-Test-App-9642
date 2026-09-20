@@ -25,12 +25,16 @@ export async function fetchMeta(signal) {
     throw new Error('Metadata service unavailable');
   }
 
-  return response.json();
+  const data = await response.json();
+  const cfColo = response.headers.get('cf-colo');
+  const serverTiming = response.headers.get('Server-Timing');
+  return { ...data, cfColo, serverTiming };
 }
 
 export async function measurePing(samples = 10, signal) {
   const readings = [];
   let lost = 0;
+  let telemetry = {};
 
   for (let index = 0; index < samples; index += 1) {
     throwIfAborted(signal);
@@ -48,6 +52,11 @@ export async function measurePing(samples = 10, signal) {
       }
 
       readings.push(performance.now() - started);
+
+      if (!telemetry.cfColo && response.headers.get('cf-colo')) {
+        telemetry.cfColo = response.headers.get('cf-colo');
+        telemetry.serverTiming = response.headers.get('Server-Timing');
+      }
     } catch (error) {
       if (error.name === 'AbortError') {
         throw error;
@@ -72,7 +81,8 @@ export async function measurePing(samples = 10, signal) {
     jitter: round(Math.sqrt(variance)),
     loss: round((lost / samples) * 100),
     min: round(Math.min(...readings)),
-    max: round(Math.max(...readings))
+    max: round(Math.max(...readings)),
+    telemetry
   };
 }
 
@@ -110,6 +120,12 @@ async function consumeDownload(bytes, onBytes, signal) {
 }
 
 export async function measureDownload(onProgress = () => {}, signal) {
+  const PHASE_TIMEOUT_MS = 15000;
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Phase timeout')), PHASE_TIMEOUT_MS);
+  });
+
   const started = performance.now();
   let totalBytes = 0;
 
@@ -120,11 +136,21 @@ export async function measureDownload(onProgress = () => {}, signal) {
     onProgress(round(speed));
   };
 
-  await Promise.all(
-    Array.from({ length: 4 }, () =>
-      consumeDownload(12 * 1024 * 1024, recordBytes, signal)
-    )
-  );
+  try {
+    await Promise.race([
+      Promise.all(
+        Array.from({ length: 4 }, () =>
+          consumeDownload(12 * 1024 * 1024, recordBytes, signal)
+        )
+      ),
+      timeoutPromise
+    ]);
+  } catch (error) {
+    if (error.name === 'AbortError') throw error;
+    // Otherwise graceful fail-soft, keep whatever bytes were transferred
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   return round(
     (totalBytes * 8) /
@@ -171,6 +197,12 @@ async function uploadPayload(payload, signal) {
 }
 
 export async function measureUpload(onProgress = () => {}, signal) {
+  const PHASE_TIMEOUT_MS = 15000;
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('Phase timeout')), PHASE_TIMEOUT_MS);
+  });
+
   const payload = createUploadPayload(4 * 1024 * 1024);
   const started = performance.now();
   let completedBytes = 0;
@@ -186,7 +218,17 @@ export async function measureUpload(onProgress = () => {}, signal) {
     return bytes;
   });
 
-  await Promise.all(streams);
+  try {
+    await Promise.race([
+      Promise.all(streams),
+      timeoutPromise
+    ]);
+  } catch (error) {
+    if (error.name === 'AbortError') throw error;
+    // fail soft
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   return round(
     (completedBytes * 8) /
@@ -225,6 +267,9 @@ async function runBackgroundUpload(signal) {
 }
 
 export async function measureLoadedPing(durationMs = 3500, signal) {
+  const PHASE_TIMEOUT_MS = 15000;
+  const watchdogStarted = performance.now();
+
   const started = performance.now();
   const readings = [];
   let lost = 0;
@@ -234,7 +279,7 @@ export async function measureLoadedPing(durationMs = 3500, signal) {
     runBackgroundUpload(signal)
   ]);
 
-  while (performance.now() - started < durationMs) {
+  while (performance.now() - started < durationMs && performance.now() - watchdogStarted < PHASE_TIMEOUT_MS) {
     throwIfAborted(signal);
 
     const pingStarted = performance.now();

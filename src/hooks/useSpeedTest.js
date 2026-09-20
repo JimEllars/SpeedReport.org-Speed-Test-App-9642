@@ -63,7 +63,19 @@ export function useSpeedTest(onComplete) {
         measurePing(12, controller.signal)
       ]);
 
-      setMeta(network);
+      const mergedNetwork = { ...network };
+      if (idle.telemetry?.cfColo && !mergedNetwork.colo) {
+        mergedNetwork.colo = idle.telemetry.cfColo;
+      }
+      if (network.cfColo && !mergedNetwork.colo) {
+        mergedNetwork.colo = network.cfColo;
+      }
+      if (idle.telemetry?.serverTiming) {
+        mergedNetwork.serverTiming = idle.telemetry.serverTiming;
+      } else if (network.serverTiming) {
+        mergedNetwork.serverTiming = network.serverTiming;
+      }
+      setMeta(mergedNetwork);
       setMetrics((current) => ({ ...current, ...idle }));
 
       setState(STATES.DOWNLOAD);
@@ -94,16 +106,24 @@ export function useSpeedTest(onComplete) {
         bufferbloat: bufferGrade(delta)
       };
 
+      let partialFailure = false;
+      if (!download || !upload) {
+        partialFailure = true;
+      }
+
       const report = {
         id: `SR-${Date.now().toString(36).toUpperCase()}`,
         timestamp: new Date().toISOString(),
         metrics: completeMetrics,
-        meta: network,
+        meta: mergedNetwork,
         readiness: getReadiness(completeMetrics).grade
       };
 
       setMetrics(completeMetrics);
-      setState(STATES.COMPLETE);
+      setState(partialFailure ? STATES.COMPLETED_PARTIAL : STATES.COMPLETE);
+      if (partialFailure) {
+        setError('Test completed partially due to network instability.');
+      }
       onComplete(report);
     } catch (reason) {
       if (reason.name === 'AbortError') {

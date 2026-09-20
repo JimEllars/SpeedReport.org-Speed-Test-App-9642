@@ -46,7 +46,7 @@ export default function ISPDetailsCard({ meta }) {
           <dt>Edge node</dt>
           <dd>
             <SafeIcon icon={FiMapPin} />
-            {meta ? `${meta.city}, ${meta.country} · ${meta.colo}` : '—'}
+            {meta ? `${meta.city}, ${meta.country} · ${meta.colo || 'Nearest'}` : '—'}
           </dd>
         </div>
       </dl>
