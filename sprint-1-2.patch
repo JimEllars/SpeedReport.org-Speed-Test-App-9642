@@ -1,0 +1,3796 @@
+From adec9f16446334e4d56e26de71e41a2c4ee12791 Mon Sep 17 00:00:00 2001
+From: Greta Bot <greta@questlabs.ai>
+Date: Sun, 20 Sep 2026 20:14:03 +0000
+Subject: [PATCH] Update files via Greta
+
+---
+ .gitignore                              |  25 +
+ eslint.config.js                        |  40 ++
+ index.html                              |  37 ++
+ package.json                            |  38 ++
+ postcss.config.js                       |   6 +
+ public/robots.txt                       |   4 +
+ public/sitemap.xml                      |   8 +
+ speedreport-worker/package.json         |  13 +
+ speedreport-worker/src/download.ts      |  34 +
+ speedreport-worker/src/http.ts          |  16 +
+ speedreport-worker/src/index.ts         |  41 ++
+ speedreport-worker/src/meta.ts          |  24 +
+ speedreport-worker/src/upload.ts        |  29 +
+ speedreport-worker/wrangler.jsonc       |   8 +
+ src/App.css                             | 846 ++++++++++++++++++++++++
+ src/App.jsx                             | 139 ++++
+ src/common/SafeIcon.jsx                 |  18 +
+ src/common/testConstants.js             |  20 +
+ src/components/BusinessAuditCard.jsx    |  33 +
+ src/components/DiagnosticsSummary.jsx   |  90 +++
+ src/components/Header.jsx               |  22 +
+ src/components/ISPDetailsCard.jsx       |  55 ++
+ src/components/MetricsGrid.jsx          |  43 ++
+ src/components/ReportCard.jsx           | 104 +++
+ src/components/ReportComparisonCard.css | 101 +++
+ src/components/ReportComparisonCard.jsx |  96 +++
+ src/components/ReportShareCard.css      | 114 ++++
+ src/components/ReportShareCard.jsx      | 101 +++
+ src/components/SpeedGauge.jsx           |  94 +++
+ src/components/TestHistoryVault.css     |  30 +
+ src/components/TestHistoryVault.jsx     | 127 ++++
+ src/hooks/useLocalVault.js              |  45 ++
+ src/hooks/useSpeedTest.js               | 134 ++++
+ src/index.css                           |  28 +
+ src/main.jsx                            |  10 +
+ src/utils/benchmarkEngine.js            | 290 ++++++++
+ src/utils/pdfReportGenerator.js         | 186 ++++++
+ src/utils/readiness.js                  |  18 +
+ src/utils/reportActions.js              | 237 +++++++
+ src/utils/reportShareLinks.js           |  77 +++
+ tailwind.config.js                      |   8 +
+ vite.config.js                          |  19 +
+ 42 files changed, 3408 insertions(+)
+ create mode 100644 .gitignore
+ create mode 100644 eslint.config.js
+ create mode 100644 index.html
+ create mode 100644 package.json
+ create mode 100644 postcss.config.js
+ create mode 100644 public/robots.txt
+ create mode 100644 public/sitemap.xml
+ create mode 100644 speedreport-worker/package.json
+ create mode 100644 speedreport-worker/src/download.ts
+ create mode 100644 speedreport-worker/src/http.ts
+ create mode 100644 speedreport-worker/src/index.ts
+ create mode 100644 speedreport-worker/src/meta.ts
+ create mode 100644 speedreport-worker/src/upload.ts
+ create mode 100644 speedreport-worker/wrangler.jsonc
+ create mode 100644 src/App.css
+ create mode 100644 src/App.jsx
+ create mode 100644 src/common/SafeIcon.jsx
+ create mode 100644 src/common/testConstants.js
+ create mode 100644 src/components/BusinessAuditCard.jsx
+ create mode 100644 src/components/DiagnosticsSummary.jsx
+ create mode 100644 src/components/Header.jsx
+ create mode 100644 src/components/ISPDetailsCard.jsx
+ create mode 100644 src/components/MetricsGrid.jsx
+ create mode 100644 src/components/ReportCard.jsx
+ create mode 100644 src/components/ReportComparisonCard.css
+ create mode 100644 src/components/ReportComparisonCard.jsx
+ create mode 100644 src/components/ReportShareCard.css
+ create mode 100644 src/components/ReportShareCard.jsx
+ create mode 100644 src/components/SpeedGauge.jsx
+ create mode 100644 src/components/TestHistoryVault.css
+ create mode 100644 src/components/TestHistoryVault.jsx
+ create mode 100644 src/hooks/useLocalVault.js
+ create mode 100644 src/hooks/useSpeedTest.js
+ create mode 100644 src/index.css
+ create mode 100644 src/main.jsx
+ create mode 100644 src/utils/benchmarkEngine.js
+ create mode 100644 src/utils/pdfReportGenerator.js
+ create mode 100644 src/utils/readiness.js
+ create mode 100644 src/utils/reportActions.js
+ create mode 100644 src/utils/reportShareLinks.js
+ create mode 100644 tailwind.config.js
+ create mode 100644 vite.config.js
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..1cac559
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,25 @@
++# Logs
++logs
++*.log
++npm-debug.log*
++yarn-debug.log*
++yarn-error.log*
++pnpm-debug.log*
++lerna-debug.log*
++
++node_modules
++dist
++dist-ssr
++*.local
++
++# Editor directories and files
++.vscode/*
++!.vscode/extensions.json
++.idea
++.DS_Store
++*.suo
++*.ntvs*
++*.njsproj
++*.sln
++*.sw?
++.env
+\ No newline at end of file
+diff --git a/eslint.config.js b/eslint.config.js
+new file mode 100644
+index 0000000..d2c30e9
+--- /dev/null
++++ b/eslint.config.js
+@@ -0,0 +1,40 @@
++import js from '@eslint/js';
++import globals from 'globals';
++import reactHooks from 'eslint-plugin-react-hooks';
++import reactRefresh from 'eslint-plugin-react-refresh';
++
++export default [
++  { ignores: ['dist'] },
++  js.configs.recommended,
++  {
++    files: ['**/*.{js,jsx}'],
++    languageOptions: {
++      ecmaVersion: 2020,
++      globals: {
++        ...globals.browser,
++        ...globals.node,
++        React: true,
++        JSX: true
++      },
++      parserOptions: {
++        ecmaFeatures: {
++          jsx: true
++        },
++        sourceType: 'module'
++      }
++    },
++    plugins: {
++      'react-hooks': reactHooks,
++      'react-refresh': reactRefresh,
++    },
++    rules: {
++      'no-undef': 'error',
++      'react-hooks/rules-of-hooks': 'error',
++      'react-hooks/exhaustive-deps': 'off',
++      'react-refresh/only-export-components': 'off',
++      'no-unused-vars': 'off',
++      'no-case-declarations': 'off',
++      'no-useless-catch': 'off'
++    },
++  }
++];
+\ No newline at end of file
+diff --git a/index.html b/index.html
+new file mode 100644
+index 0000000..6497fc0
+--- /dev/null
++++ b/index.html
+@@ -0,0 +1,37 @@
++<!doctype html>
++<html lang="en">
++  <head>
++    <meta charset="UTF-8" />
++    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++    <title>SpeedReport.org — Enterprise Internet Speed Test</title>
++    <meta name="description" content="Business-grade internet speed testing, network diagnostics, readiness analysis, and downloadable verification reports." />
++    <meta name="keywords" content="enterprise speed test, internet diagnostics, latency, jitter, packet loss, bufferbloat, business broadband" />
++    <meta name="author" content="SpeedReport.org" />
++    <meta name="robots" content="index, follow" />
++    <meta name="language" content="English" />
++    <meta name="revisit-after" content="7 days" />
++    <meta name="theme-color" content="#080c14" />
++    <meta name="color-scheme" content="dark" />
++    <meta name="mobile-web-app-capable" content="yes" />
++    <link rel="canonical" href="https://speedreport.org/" />
++    <link rel="icon" href="https://example.com/favicon.ico" />
++    <link rel="manifest" href="https://example.com/manifest.webmanifest" />
++    <link rel="preconnect" href="https://fonts.googleapis.com" />
++    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
++    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet" />
++    <meta property="og:title" content="SpeedReport.org — Enterprise Internet Speed Test" />
++    <meta property="og:description" content="Business-grade network diagnostics and verification reports." />
++    <meta property="og:type" content="website" />
++    <meta property="og:url" content="https://speedreport.org/" />
++    <meta property="og:image" content="https://example.com/social-card.png" />
++    <meta name="twitter:card" content="summary_large_image" />
++    <meta name="twitter:title" content="SpeedReport.org" />
++    <meta name="twitter:description" content="Enterprise internet connection and network diagnostics." />
++    <meta name="twitter:image" content="https://example.com/social-card.png" />
++    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"SpeedReport.org","url":"https://speedreport.org/","description":"Enterprise internet connection and network diagnostics."}</script>
++  </head>
++  <body>
++    <div id="root"></div>
++    <script type="module" src="/src/main.jsx"></script>
++  </body>
++</html>
+\ No newline at end of file
+diff --git a/package.json b/package.json
+new file mode 100644
+index 0000000..00c8c35
+--- /dev/null
++++ b/package.json
+@@ -0,0 +1,38 @@
++{
++  "name": "speedreport-org",
++  "private": true,
++  "version": "1.0.0",
++  "type": "module",
++  "scripts": {
++    "dev": "vite",
++    "build": "vite build",
++    "lint": "eslint .",
++    "lint:error": "eslint . --quiet",
++    "preview": "vite preview"
++  },
++  "dependencies": {
++    "@questlabs/react-sdk": "^2.2.92",
++    "@supabase/supabase-js": "^2.39.0",
++    "date-fns": "4.1.0",
++    "echarts": "^5.5.0",
++    "echarts-for-react": "^3.0.2",
++    "framer-motion": "^11.0.8",
++    "pdf-lib": "^1.17.1",
++    "react": "^18.3.1",
++    "react-dom": "^18.3.1",
++    "react-icons": "^5.4.0",
++    "react-router-dom": "^7.1.0"
++  },
++  "devDependencies": {
++    "@eslint/js": "^9.9.1",
++    "@vitejs/plugin-react": "^4.3.1",
++    "autoprefixer": "^10.4.20",
++    "eslint": "^9.9.1",
++    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
++    "eslint-plugin-react-refresh": "^0.4.11",
++    "globals": "^15.9.0",
++    "postcss": "^8.4.49",
++    "tailwindcss": "^3.4.17",
++    "vite": "^5.4.2"
++  }
++}
+\ No newline at end of file
+diff --git a/postcss.config.js b/postcss.config.js
+new file mode 100644
+index 0000000..e99ebc2
+--- /dev/null
++++ b/postcss.config.js
+@@ -0,0 +1,6 @@
++export default {
++  plugins: {
++    tailwindcss: {},
++    autoprefixer: {},
++  },
++}
+\ No newline at end of file
+diff --git a/public/robots.txt b/public/robots.txt
+new file mode 100644
+index 0000000..f115178
+--- /dev/null
++++ b/public/robots.txt
+@@ -0,0 +1,4 @@
++User-agent: *
++Allow: /
++
++Sitemap: https://speedreport.org/sitemap.xml
+\ No newline at end of file
+diff --git a/public/sitemap.xml b/public/sitemap.xml
+new file mode 100644
+index 0000000..3a6b550
+--- /dev/null
++++ b/public/sitemap.xml
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
++  <url>
++    <loc>https://speedreport.org/</loc>
++    <changefreq>weekly</changefreq>
++    <priority>1.0</priority>
++  </url>
++</urlset>
+\ No newline at end of file
+diff --git a/speedreport-worker/package.json b/speedreport-worker/package.json
+new file mode 100644
+index 0000000..ffff64e
+--- /dev/null
++++ b/speedreport-worker/package.json
+@@ -0,0 +1,13 @@
++{
++  "name": "speedreport-edge-engine",
++  "private": true,
++  "version": "1.0.0",
++  "type": "module",
++  "scripts": {
++    "dev": "wrangler dev",
++    "deploy": "wrangler deploy"
++  },
++  "devDependencies": {
++    "wrangler": "^4.11.1"
++  }
++}
+\ No newline at end of file
+diff --git a/speedreport-worker/src/download.ts b/speedreport-worker/src/download.ts
+new file mode 100644
+index 0000000..6a9df13
+--- /dev/null
++++ b/speedreport-worker/src/download.ts
+@@ -0,0 +1,34 @@
++import { cors } from './http';
++
++const CHUNK_SIZE = 64 * 1024;
++const DEFAULT_BYTES = 10 * 1024 * 1024;
++const MAX_BYTES = 50 * 1024 * 1024;
++
++export function handleDownload(url: URL): Response {
++  const requested = Number(url.searchParams.get('bytes')) || DEFAULT_BYTES;
++  const target = Math.min(Math.max(requested, CHUNK_SIZE), MAX_BYTES);
++  const chunk = new Uint8Array(CHUNK_SIZE);
++  let sent = 0;
++
++  const stream = new ReadableStream({
++    pull(controller) {
++      if (sent >= target) {
++        controller.close();
++        return;
++      }
++      const remaining = target - sent;
++      const output = remaining >= CHUNK_SIZE ? chunk : chunk.slice(0, remaining);
++      controller.enqueue(output);
++      sent += output.byteLength;
++    }
++  });
++
++  return new Response(stream, {
++    headers: {
++      ...cors,
++      'Content-Type': 'application/octet-stream',
++      'Content-Length': String(target),
++      'Content-Encoding': 'identity'
++    }
++  });
++}
+\ No newline at end of file
+diff --git a/speedreport-worker/src/http.ts b/speedreport-worker/src/http.ts
+new file mode 100644
+index 0000000..91af114
+--- /dev/null
++++ b/speedreport-worker/src/http.ts
+@@ -0,0 +1,16 @@
++export const cors = {
++  'Access-Control-Allow-Origin': '*',
++  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
++  'Access-Control-Allow-Headers': 'Content-Type, Cache-Control',
++  'Cache-Control': 'no-store'
++};
++
++export function json(data: unknown, status = 200): Response {
++  return new Response(JSON.stringify(data), {
++    status,
++    headers: {
++      ...cors,
++      'Content-Type': 'application/json'
++    }
++  });
++}
+\ No newline at end of file
+diff --git a/speedreport-worker/src/index.ts b/speedreport-worker/src/index.ts
+new file mode 100644
+index 0000000..085ab29
+--- /dev/null
++++ b/speedreport-worker/src/index.ts
+@@ -0,0 +1,41 @@
++import { handleDownload } from './download';
++import { cors, json } from './http';
++import { handleMeta } from './meta';
++import { handleUpload } from './upload';
++
++export default {
++  async fetch(request: Request): Promise<Response> {
++    const url = new URL(request.url);
++
++    if (request.method === 'OPTIONS') {
++      return new Response(null, {
++        status: 204,
++        headers: cors
++      });
++    }
++
++    if (url.pathname === '/api/meta' && request.method === 'GET') {
++      return handleMeta(request);
++    }
++
++    if (url.pathname === '/api/ping' && request.method === 'GET') {
++      return new Response(null, {
++        status: 204,
++        headers: {
++          ...cors,
++          'Content-Length': '0'
++        }
++      });
++    }
++
++    if (url.pathname === '/api/download' && request.method === 'GET') {
++      return handleDownload(url);
++    }
++
++    if (url.pathname === '/api/upload' && request.method === 'POST') {
++      return handleUpload(request);
++    }
++
++    return json({ error: 'Not found' }, 404);
++  }
++};
+\ No newline at end of file
+diff --git a/speedreport-worker/src/meta.ts b/speedreport-worker/src/meta.ts
+new file mode 100644
+index 0000000..950c08f
+--- /dev/null
++++ b/speedreport-worker/src/meta.ts
+@@ -0,0 +1,24 @@
++import { json } from './http';
++
++interface CloudflareRequest extends Request {
++  cf?: {
++    asOrganization?: string;
++    asn?: number;
++    city?: string;
++    region?: string;
++    country?: string;
++    colo?: string;
++  };
++}
++
++export function handleMeta(request: CloudflareRequest): Response {
++  return json({
++    ip: request.headers.get('cf-connecting-ip') || 'Unknown',
++    isp: request.cf?.asOrganization || 'Commercial Broadband',
++    asn: request.cf?.asn || 0,
++    city: request.cf?.city || 'Local',
++    region: request.cf?.region || '',
++    country: request.cf?.country || 'US',
++    colo: request.cf?.colo || 'Nearest'
++  });
++}
+\ No newline at end of file
+diff --git a/speedreport-worker/src/upload.ts b/speedreport-worker/src/upload.ts
+new file mode 100644
+index 0000000..52b3be6
+--- /dev/null
++++ b/speedreport-worker/src/upload.ts
+@@ -0,0 +1,29 @@
++import { json } from './http';
++
++export async function handleUpload(request: Request): Promise<Response> {
++  if (!request.body) {
++    return json({
++      receivedBytes: 0,
++      durationMs: 0
++    });
++  }
++
++  const started = Date.now();
++  const reader = request.body.getReader();
++  let receivedBytes = 0;
++
++  try {
++    while (true) {
++      const { done, value } = await reader.read();
++      if (done) break;
++      receivedBytes += value.byteLength;
++    }
++  } finally {
++    reader.releaseLock();
++  }
++
++  return json({
++    receivedBytes,
++    durationMs: Math.max(Date.now() - started, 1)
++  });
++}
+\ No newline at end of file
+diff --git a/speedreport-worker/wrangler.jsonc b/speedreport-worker/wrangler.jsonc
+new file mode 100644
+index 0000000..017a6f1
+--- /dev/null
++++ b/speedreport-worker/wrangler.jsonc
+@@ -0,0 +1,8 @@
++{
++  "name": "speedreport-edge-engine",
++  "main": "src/index.ts",
++  "compatibility_date": "2025-03-01",
++  "observability": {
++    "enabled": true
++  }
++}
+\ No newline at end of file
+diff --git a/src/App.css b/src/App.css
+new file mode 100644
+index 0000000..688e3b0
+--- /dev/null
++++ b/src/App.css
+@@ -0,0 +1,846 @@
++:root {
++  color: #e7edf8;
++  background: #080c14;
++  font-family: 'DM Sans', sans-serif;
++}
++
++body {
++  min-width: 320px;
++  min-height: 100vh;
++  background:
++    radial-gradient(circle at 15% -10%, rgba(37, 99, 235, 0.14), transparent 34rem),
++    radial-gradient(circle at 90% 20%, rgba(16, 185, 129, 0.07), transparent 30rem),
++    #080c14;
++}
++
++button {
++  font: inherit;
++}
++
++.app-shell {
++  width: min(1320px, calc(100% - 48px));
++  margin: auto;
++}
++
++.header {
++  height: 92px;
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  border-bottom: 1px solid #202938;
++}
++
++.brand,
++.trust,
++.trust span,
++.metric-top,
++.panel-heading,
++.ip,
++.detail-list dd,
++.audit-row,
++.certificate,
++.primary-button,
++.report-button,
++.icon-button {
++  display: flex;
++  align-items: center;
++}
++
++.brand {
++  gap: 12px;
++}
++
++.brand-mark {
++  display: grid;
++  place-items: center;
++  width: 39px;
++  height: 39px;
++  border-radius: 11px;
++  color: #fff;
++  background: linear-gradient(145deg, #2563eb, #1554cf);
++  box-shadow: 0 8px 30px rgba(37, 99, 235, .25);
++}
++
++.brand strong {
++  display: block;
++  font: 700 18px 'Manrope';
++}
++
++.brand strong span {
++  color: #4d8cff;
++}
++
++.brand small {
++  display: block;
++  margin-top: 2px;
++  color: #6f7c91;
++  font-size: 11px;
++}
++
++.trust {
++  gap: 24px;
++  color: #8290a5;
++  font-size: 12px;
++}
++
++.trust span {
++  gap: 7px;
++}
++
++.trust svg {
++  color: #44d29c;
++}
++
++main {
++  padding: 70px 0 54px;
++}
++
++.intro {
++  display: grid;
++  grid-template-columns: 1.25fr .75fr;
++  align-items: end;
++  gap: 60px;
++  margin-bottom: 42px;
++}
++
++.eyebrow {
++  color: #5f91fa;
++  font-size: 10px;
++  font-weight: 700;
++  letter-spacing: .15em;
++  text-transform: uppercase;
++}
++
++.intro h1 {
++  margin-top: 13px;
++  font: 700 clamp(38px, 5vw, 64px)/1.04 'Manrope';
++  letter-spacing: -.045em;
++}
++
++.intro h1 em {
++  color: #75a4ff;
++  font-style: normal;
++}
++
++.intro p {
++  color: #8c99ad;
++  font-size: 15px;
++  line-height: 1.8;
++  max-width: 510px;
++}
++
++.dashboard-grid {
++  display: grid;
++  grid-template-columns: minmax(360px, .8fr) 1.2fr;
++  gap: 18px;
++}
++
++.gauge-card,
++.panel,
++.metric-card {
++  background: rgba(15, 22, 34, .88);
++  border: 1px solid #202a3a;
++  border-radius: 18px;
++}
++
++.gauge-card {
++  padding: 28px 34px;
++  min-height: 524px;
++  position: relative;
++  overflow: hidden;
++}
++
++.gauge-card:before {
++  content: '';
++  position: absolute;
++  width: 270px;
++  height: 270px;
++  border-radius: 50%;
++  top: 20px;
++  left: 50%;
++  transform: translateX(-50%);
++  background: rgba(37, 99, 235, .08);
++  filter: blur(40px);
++}
++
++.status-line {
++  position: relative;
++  display: flex;
++  justify-content: center;
++  gap: 9px;
++  color: #8390a3;
++  font-size: 12px;
++}
++
++.pulse-dot {
++  width: 7px;
++  height: 7px;
++  margin-top: 4px;
++  border-radius: 50%;
++  background: #455064;
++}
++
++.pulse-dot.active {
++  background: #38d997;
++  box-shadow: 0 0 0 5px rgba(56, 217, 151, .1);
++  animation: pulse 1.4s infinite;
++}
++
++.gauge {
++  position: relative;
++  max-width: 350px;
++  margin: 16px auto -5px;
++}
++
++.gauge svg {
++  width: 100%;
++  overflow: visible;
++}
++
++.gauge-track,
++.gauge-progress {
++  fill: none;
++  stroke-width: 11;
++  stroke-linecap: round;
++}
++
++.gauge-track {
++  stroke: #1d2736;
++}
++
++.gauge-progress {
++  stroke: #357af3;
++}
++
++.gauge-value {
++  position: absolute;
++  inset: 52% 0 auto;
++  display: flex;
++  flex-direction: column;
++  align-items: center;
++}
++
++.gauge-value strong {
++  font: 700 48px/1 'Manrope';
++  letter-spacing: -.05em;
++}
++
++.gauge-value span {
++  margin-top: 7px;
++  color: #748196;
++  font-size: 12px;
++}
++
++.gauge-value small {
++  margin-top: 12px;
++  color: #4d86ee;
++  font-size: 9px;
++  letter-spacing: .2em;
++}
++
++.sparkline {
++  display: block;
++  width: 100%;
++  height: 58px;
++  margin: 0 auto 22px;
++  opacity: .8;
++}
++
++.sparkline polyline {
++  fill: none;
++  stroke: #3478ed;
++  stroke-width: 2;
++  vector-effect: non-scaling-stroke;
++}
++
++.primary-button,
++.report-button {
++  justify-content: center;
++  gap: 9px;
++  border: 0;
++  color: white;
++  background: linear-gradient(135deg, #2466da, #347ff3);
++  border-radius: 10px;
++  cursor: pointer;
++  font-weight: 700;
++  transition: .2s ease;
++}
++
++.primary-button {
++  width: 100%;
++  padding: 15px;
++}
++
++.primary-button:hover,
++.report-button:hover {
++  transform: translateY(-1px);
++  filter: brightness(1.1);
++}
++
++.primary-button:disabled,
++.report-button:disabled {
++  cursor: wait;
++  opacity: .7;
++  transform: none;
++}
++
++.cancel-button {
++  color: #ffd6d6;
++  background: linear-gradient(135deg, #8f2e45, #b13c50);
++}
++
++.cancel-button:hover {
++  background: linear-gradient(135deg, #a33750, #c54b5d);
++}
++
++.test-note {
++  margin-top: 13px;
++  color: #59667a;
++  font-size: 10px;
++  text-align: center;
++}
++
++.metrics-column {
++  display: flex;
++  flex-direction: column;
++  gap: 18px;
++}
++
++.metrics-grid {
++  display: grid;
++  grid-template-columns: repeat(3, 1fr);
++  gap: 12px;
++}
++
++.metric-card {
++  padding: 20px;
++  min-height: 110px;
++}
++
++.metric-top {
++  gap: 8px;
++  color: #7d8ba0;
++  font-size: 11px;
++}
++
++.metric-top svg {
++  color: #4d87ee;
++}
++
++.metric-value {
++  margin-top: 17px;
++  font: 700 25px 'Manrope';
++}
++
++.metric-value small {
++  color: #617086;
++  font: 500 10px 'DM Sans';
++}
++
++.panel {
++  padding: 25px;
++}
++
++.panel-heading {
++  justify-content: space-between;
++}
++
++.panel-heading h2 {
++  margin-top: 5px;
++  font: 700 18px 'Manrope';
++}
++
++.panel-heading > svg {
++  color: #4d87ee;
++  font-size: 21px;
++}
++
++.detail-list {
++  margin-top: 17px;
++}
++
++.detail-list > div {
++  display: grid;
++  grid-template-columns: 135px 1fr;
++  padding: 10px 0;
++  border-top: 1px solid #1d2735;
++  font-size: 12px;
++}
++
++.detail-list dt {
++  color: #68768b;
++}
++
++.detail-list dd {
++  justify-content: flex-end;
++  gap: 6px;
++  color: #dbe4f3;
++  font-weight: 600;
++  text-align: right;
++}
++
++.ip button {
++  display: grid;
++  place-items: center;
++  padding: 3px;
++  border: 0;
++  color: #6493e9;
++  background: transparent;
++  cursor: pointer;
++}
++
++.report-card {
++  margin-top: 18px;
++  padding: 27px 30px;
++  display: grid;
++  grid-template-columns: auto 1fr auto;
++  gap: 22px;
++  align-items: center;
++  border: 1px solid rgba(61, 140, 246, .38);
++  border-radius: 18px;
++  background: linear-gradient(120deg, rgba(28, 75, 150, .23), rgba(13, 24, 40, .8));
++}
++
++.report-icon {
++  display: grid;
++  place-items: center;
++  width: 52px;
++  height: 52px;
++  border-radius: 14px;
++  color: #80aeff;
++  background: rgba(48, 116, 229, .16);
++  font-size: 22px;
++}
++
++.report-copy h2 {
++  margin: 5px 0;
++  font: 700 19px 'Manrope';
++}
++
++.report-copy p {
++  color: #77869b;
++  font-size: 12px;
++}
++
++.certificate {
++  gap: 5px;
++  margin-top: 8px;
++  color: #7f91aa;
++  font-size: 10px;
++}
++
++.report-actions {
++  display: flex;
++  flex-wrap: wrap;
++  justify-content: flex-end;
++  gap: 8px;
++}
++
++.report-button {
++  padding: 13px 16px;
++  white-space: nowrap;
++}
++
++.report-button.secondary {
++  color: #a8bfdf;
++  background: #18263c;
++}
++
++.report-success,
++.report-error {
++  display: block;
++  margin-top: 8px;
++  font-size: 10px;
++}
++
++.report-success {
++  color: #45d6a0;
++}
++
++.report-error {
++  color: #f5bc6e;
++}
++
++.diagnostics-panel {
++  margin-top: 18px;
++}
++
++.diagnostics-id {
++  padding: 7px 10px;
++  border: 1px solid #283852;
++  border-radius: 7px;
++  color: #7896ca;
++  background: rgba(37, 99, 235, .08);
++  font: 600 10px monospace;
++}
++
++.diagnostic-grid {
++  display: grid;
++  grid-template-columns: repeat(4, 1fr);
++  gap: 10px;
++  margin-top: 22px;
++}
++
++.diagnostic-item {
++  position: relative;
++  min-height: 155px;
++  padding: 16px;
++  border: 1px solid #202d40;
++  border-radius: 12px;
++  background: rgba(8, 14, 24, .42);
++}
++
++.diagnostic-icon {
++  display: grid;
++  place-items: center;
++  width: 31px;
++  height: 31px;
++  border-radius: 8px;
++  color: #65a0ff;
++  background: #182944;
++}
++
++.diagnostic-copy {
++  margin-top: 14px;
++}
++
++.diagnostic-copy span,
++.diagnostic-copy strong,
++.diagnostic-copy small {
++  display: block;
++}
++
++.diagnostic-copy span {
++  color: #8794a8;
++  font-size: 10px;
++}
++
++.diagnostic-copy strong {
++  margin-top: 7px;
++  color: #e6edf8;
++  font: 700 20px 'Manrope';
++}
++
++.diagnostic-copy small {
++  margin-top: 5px;
++  color: #637188;
++  font-size: 9px;
++  line-height: 1.4;
++}
++
++.diagnostic-item > b {
++  position: absolute;
++  right: 12px;
++  top: 17px;
++  font-size: 9px;
++  font-weight: 700;
++}
++
++.healthy {
++  color: #45d6a0;
++}
++
++.review {
++  color: #f1b567;
++}
++
++.diagnostic-note {
++  margin-top: 18px;
++  padding-top: 16px;
++  border-top: 1px solid #1c2634;
++  color: #68778d;
++  font-size: 11px;
++  line-height: 1.7;
++}
++
++.lower-grid {
++  display: grid;
++  grid-template-columns: 1fr 1fr;
++  gap: 18px;
++  margin-top: 18px;
++}
++
++.grade {
++  padding: 7px 10px;
++  border-radius: 7px;
++  color: #7b879a;
++  background: #192230;
++  font-size: 10px;
++  font-weight: 700;
++}
++
++.grade.ready {
++  color: #55dca8;
++  background: rgba(35, 190, 130, .1);
++}
++
++.audit-list {
++  margin-top: 19px;
++}
++
++.audit-row {
++  gap: 12px;
++  padding: 12px 0;
++  border-top: 1px solid #1c2634;
++}
++
++.audit-icon {
++  display: grid;
++  place-items: center;
++  width: 32px;
++  height: 32px;
++  border-radius: 8px;
++  color: #5e91ef;
++  background: #182439;
++}
++
++.audit-row div {
++  flex: 1;
++}
++
++.audit-row strong,
++.audit-row small {
++  display: block;
++}
++
++.audit-row strong {
++  font-size: 12px;
++}
++
++.audit-row small {
++  margin-top: 4px;
++  color: #6f7d91;
++  font-size: 10px;
++}
++
++.check {
++  color: #3fd39d;
++}
++
++.icon-button {
++  gap: 5px;
++  border: 0;
++  color: #718097;
++  background: transparent;
++  cursor: pointer;
++  font-size: 10px;
++}
++
++.empty-state {
++  padding: 49px 0 35px;
++  color: #566276;
++  text-align: center;
++}
++
++.empty-state svg {
++  font-size: 25px;
++}
++
++.empty-state p {
++  margin-top: 10px;
++  font-size: 11px;
++}
++
++.history-chart {
++  margin: 22px 0 17px;
++  padding: 13px 15px 12px;
++  border: 1px solid #1e2a3a;
++  border-radius: 12px;
++  background: rgba(8, 14, 24, .5);
++}
++
++.chart-label {
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  color: #718099;
++  font-size: 10px;
++}
++
++.chart-label svg {
++  color: #4b87ee;
++}
++
++.bars {
++  height: 58px;
++  display: flex;
++  align-items: end;
++  gap: 8px;
++  margin-top: 12px;
++}
++
++.bar-column {
++  flex: 1;
++  height: 100%;
++  display: flex;
++  align-items: end;
++}
++
++.bar {
++  width: 100%;
++  min-height: 5px;
++  border-radius: 4px 4px 1px 1px;
++  background: linear-gradient(180deg, #4b8bf2, #2353ad);
++}
++
++.history-table {
++  margin-top: 19px;
++  min-width: 460px;
++}
++
++.history-panel {
++  overflow-x: auto;
++}
++
++.history-head,
++.history-row {
++  display: grid;
++  grid-template-columns: 1.4fr repeat(4, 1fr);
++  font-size: 10px;
++}
++
++.history-head {
++  padding: 8px 0;
++  color: #56647a;
++  text-transform: uppercase;
++}
++
++.history-row {
++  padding: 13px 0;
++  color: #8997aa;
++  border-top: 1px solid #1c2634;
++}
++
++.history-row strong {
++  color: #dae4f4;
++}
++
++.history-row b {
++  color: #45d6a0;
++}
++
++.error-banner {
++  padding: 13px 16px;
++  color: #f5bc6e;
++  background: rgba(180, 83, 9, .1);
++  border: 1px solid rgba(245, 158, 11, .2);
++  border-radius: 10px;
++  font-size: 11px;
++  line-height: 1.6;
++}
++
++.error-banner code {
++  color: #ffcf89;
++}
++
++footer {
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 20px;
++  min-height: 88px;
++  color: #536075;
++  border-top: 1px solid #1a2432;
++  font-size: 10px;
++}
++
++footer strong {
++  color: #8390a3;
++  font: 700 12px 'Manrope';
++}
++
++@keyframes pulse {
++  50% {
++    box-shadow: 0 0 0 8px rgba(56, 217, 151, 0);
++  }
++}
++
++@media (max-width: 1050px) {
++  .diagnostic-grid {
++    grid-template-columns: repeat(2, 1fr);
++  }
++
++  .report-card {
++    grid-template-columns: auto 1fr;
++  }
++
++  .report-actions {
++    grid-column: 1 / -1;
++    justify-content: flex-start;
++  }
++}
++
++@media (max-width: 900px) {
++  .dashboard-grid,
++  .lower-grid {
++    grid-template-columns: 1fr;
++  }
++
++  .intro {
++    grid-template-columns: 1fr;
++    gap: 22px;
++  }
++}
++
++@media (max-width: 620px) {
++  .app-shell {
++    width: min(100% - 28px, 1320px);
++  }
++
++  .header {
++    height: 76px;
++  }
++
++  .brand small,
++  .trust {
++    display: none;
++  }
++
++  main {
++    padding-top: 45px;
++  }
++
++  .intro h1 {
++    font-size: 39px;
++  }
++
++  .metrics-grid,
++  .diagnostic-grid {
++    grid-template-columns: repeat(2, 1fr);
++  }
++
++  .gauge-card {
++    min-height: auto;
++    padding: 24px;
++  }
++
++  .report-actions {
++    display: grid;
++    grid-template-columns: repeat(2, 1fr);
++    width: 100%;
++  }
++
++  .report-button {
++    min-height: 42px;
++  }
++
++  .report-button:first-child {
++    grid-column: 1 / -1;
++  }
++
++  .diagnostic-item {
++    min-height: 145px;
++    padding: 13px;
++  }
++
++  .diagnostic-copy strong {
++    font-size: 17px;
++  }
++
++  footer {
++    flex-direction: column;
++    justify-content: center;
++    padding: 25px 0;
++    text-align: center;
++  }
++}
+\ No newline at end of file
+diff --git a/src/App.jsx b/src/App.jsx
+new file mode 100644
+index 0000000..13edadb
+--- /dev/null
++++ b/src/App.jsx
+@@ -0,0 +1,139 @@
++import { useCallback, useEffect, useState } from 'react';
++import './App.css';
++import { STATES } from './common/testConstants';
++import Header from './components/Header';
++import SpeedGauge from './components/SpeedGauge';
++import MetricsGrid from './components/MetricsGrid';
++import ISPDetailsCard from './components/ISPDetailsCard';
++import BusinessAuditCard from './components/BusinessAuditCard';
++import TestHistoryVault from './components/TestHistoryVault';
++import ReportCard from './components/ReportCard';
++import ReportShareCard from './components/ReportShareCard';
++import ReportComparisonCard from './components/ReportComparisonCard';
++import DiagnosticsSummary from './components/DiagnosticsSummary';
++import { useLocalVault } from './hooks/useLocalVault';
++import { useSpeedTest } from './hooks/useSpeedTest';
++import { readReportFromUrl } from './utils/reportShareLinks';
++
++function App() {
++  const {
++    history,
++    latestReport,
++    save,
++    clear
++  } = useLocalVault();
++  const [report, setReport] = useState(null);
++  const [isShared, setIsShared] = useState(false);
++
++  useEffect(() => {
++    const sharedReport = readReportFromUrl();
++
++    if (sharedReport) {
++      setReport(sharedReport);
++      setIsShared(true);
++      return;
++    }
++
++    if (latestReport) {
++      setReport(latestReport);
++    }
++  }, [latestReport]);
++
++  const handleComplete = useCallback((result) => {
++    setReport(result);
++    setIsShared(false);
++    save(result);
++  }, [save]);
++
++  const handleSelectReport = useCallback((selectedReport) => {
++    setReport(selectedReport);
++    setIsShared(false);
++    window.scrollTo({ top: 0, behavior: 'smooth' });
++  }, []);
++
++  const handleClearHistory = useCallback(() => {
++    if (window.confirm('Clear all locally saved reports from this device?')) {
++      clear();
++    }
++  }, [clear]);
++
++  const test = useSpeedTest(handleComplete);
++  const complete = test.state === STATES.COMPLETE;
++  const displayedMetrics = report?.metrics || test.metrics;
++  const displayedMeta = report?.meta || test.meta;
++  const previousReport = history.find((item) => item.id !== report?.id);
++
++  return (
++    <div className="app-shell">
++      <Header />
++
++      <main>
++        <section className="intro">
++          <div>
++            <span className="eyebrow">Commercial-grade edge testing</span>
++            <h1>
++              Know if your connection
++              <br />
++              <em>means business.</em>
++            </h1>
++          </div>
++          <p>
++            Measure bandwidth, latency, jitter, packet loss, and loaded performance
++            —then translate the numbers into operational readiness.
++          </p>
++        </section>
++
++        <div className="dashboard-grid">
++          <SpeedGauge
++            {...test}
++            onStart={test.start}
++            onCancel={test.cancel}
++          />
++
++          <div className="metrics-column">
++            <MetricsGrid metrics={test.metrics} />
++
++            {test.error && (
++              <div className="error-banner" role="alert">
++                <strong>Edge engine unavailable.</strong> {test.error} Deploy the
++                included Worker or configure <code>VITE_API_BASE</code>.
++              </div>
++            )}
++
++            <ISPDetailsCard meta={displayedMeta} />
++          </div>
++        </div>
++
++        <ReportCard report={report} />
++        <ReportShareCard report={report} isShared={isShared} />
++        <ReportComparisonCard
++          currentReport={report}
++          previousReport={previousReport}
++        />
++        <DiagnosticsSummary report={report} />
++
++        <div className="lower-grid">
++          <BusinessAuditCard
++            metrics={displayedMetrics}
++            complete={complete || Boolean(report)}
++          />
++          <TestHistoryVault
++            history={history}
++            onClear={handleClearHistory}
++            onSelect={handleSelectReport}
++          />
++        </div>
++      </main>
++
++      <footer>
++        <strong>SpeedReport.org</strong>
++        <span>
++          Private, ad-free network intelligence. Test history remains in your browser.
++        </span>
++        <span>© {new Date().getFullYear()}</span>
++      </footer>
++    </div>
++  );
++}
++
++export default App;
+\ No newline at end of file
+diff --git a/src/common/SafeIcon.jsx b/src/common/SafeIcon.jsx
+new file mode 100644
+index 0000000..8f73ee8
+--- /dev/null
++++ b/src/common/SafeIcon.jsx
+@@ -0,0 +1,18 @@
++import React from 'react';
++import * as FiIcons from 'react-icons/fi';
++import { FiAlertTriangle } from 'react-icons/fi';
++
++const SafeIcon = ({ icon, name, ...props }) => {
++  let IconComponent;
++  try {
++    IconComponent = icon || (name && FiIcons[`Fi${name}`]);
++  } catch (e) {
++    IconComponent = null;
++  }
++
++  return IconComponent
++    ? React.createElement(IconComponent, props)
++    : <FiAlertTriangle {...props} />;
++};
++
++export default SafeIcon;
+\ No newline at end of file
+diff --git a/src/common/testConstants.js b/src/common/testConstants.js
+new file mode 100644
+index 0000000..054b21b
+--- /dev/null
++++ b/src/common/testConstants.js
+@@ -0,0 +1,20 @@
++export const API_BASE = import.meta.env.VITE_API_BASE || '';
++export const STATES = {
++  IDLE: 'IDLE',
++  PING: 'PING_TEST',
++  DOWNLOAD: 'DOWNLOAD_TEST',
++  UPLOAD: 'UPLOAD_TEST',
++  BUFFERBLOAT: 'BUFFERBLOAT_TEST',
++  COMPLETE: 'COMPLETED',
++  ERROR: 'ERROR'
++};
++
++export const PHASE_LABELS = {
++  IDLE: 'Ready for diagnostic',
++  PING_TEST: 'Measuring latency',
++  DOWNLOAD_TEST: 'Testing download',
++  UPLOAD_TEST: 'Testing upload',
++  BUFFERBLOAT_TEST: 'Analyzing connection quality',
++  COMPLETED: 'Assessment complete',
++  ERROR: 'Test interrupted'
++};
+\ No newline at end of file
+diff --git a/src/components/BusinessAuditCard.jsx b/src/components/BusinessAuditCard.jsx
+new file mode 100644
+index 0000000..6989a61
+--- /dev/null
++++ b/src/components/BusinessAuditCard.jsx
+@@ -0,0 +1,33 @@
++import * as FiIcons from 'react-icons/fi';
++import SafeIcon from '../common/SafeIcon';
++import { formatDuration, getReadiness } from '../utils/readiness';
++
++const { FiPhoneCall, FiVideo, FiCloud, FiUsers, FiCheckCircle } = FiIcons;
++
++export default function BusinessAuditCard({ metrics, complete }) {
++  const audit = getReadiness(metrics);
++  const rows = [
++    [FiPhoneCall, 'VoIP & telephony', complete ? `${audit.calls}+ simultaneous HD calls` : 'Awaiting connection analysis'],
++    [FiVideo, 'Video conferencing', complete ? (audit.strongVideo ? '4K multi-stream ready' : 'HD use with limitations') : 'Zoom, Teams & Meet readiness'],
++    [FiCloud, 'Cloud workloads', complete ? `1 GB in ${formatDuration(audit.uploadSeconds(1))} · 10 GB in ${formatDuration(audit.uploadSeconds(10))}` : 'Upload feasibility analysis'],
++    [FiUsers, 'Office capacity', complete ? `Est. ${audit.employees} active employees` : 'Concurrent workforce estimate']
++  ];
++
++  return (
++    <section className="panel audit-panel">
++      <div className="panel-heading">
++        <div><span className="eyebrow">Operational assessment</span><h2>Business readiness</h2></div>
++        <div className={`grade ${complete ? 'ready' : ''}`}>{complete ? audit.grade : 'Pending'}</div>
++      </div>
++      <div className="audit-list">
++        {rows.map(([icon, title, detail]) => (
++          <div className="audit-row" key={title}>
++            <span className="audit-icon"><SafeIcon icon={icon} /></span>
++            <div><strong>{title}</strong><small>{detail}</small></div>
++            {complete && <SafeIcon icon={FiCheckCircle} className="check" />}
++          </div>
++        ))}
++      </div>
++    </section>
++  );
++}
+\ No newline at end of file
+diff --git a/src/components/DiagnosticsSummary.jsx b/src/components/DiagnosticsSummary.jsx
+new file mode 100644
+index 0000000..bb35224
+--- /dev/null
++++ b/src/components/DiagnosticsSummary.jsx
+@@ -0,0 +1,90 @@
++import * as FiIcons from 'react-icons/fi';
++import SafeIcon from '../common/SafeIcon';
++
++const { FiActivity, FiClock, FiTrendingUp, FiShield } = FiIcons;
++
++function difference(current, baseline) {
++  return Math.max(0, current - baseline).toFixed(1);
++}
++
++function status(value, threshold) {
++  return value <= threshold ? 'Healthy' : 'Review';
++}
++
++export default function DiagnosticsSummary({ report }) {
++  if (!report) return null;
++
++  const { metrics } = report;
++  const loadedDelta = difference(metrics.loadedPing, metrics.ping);
++  const loadedStatus = Number(loadedDelta) <= 15 ? 'Healthy' : 'Review';
++  const latencyStatus = status(metrics.ping, 50);
++  const jitterStatus = status(metrics.jitter, 10);
++  const lossStatus = metrics.loss < 1 ? 'Healthy' : 'Review';
++
++  const rows = [
++    {
++      icon: FiClock,
++      label: 'Idle latency',
++      value: `${metrics.ping} ms`,
++      detail: `${metrics.min}–${metrics.max} ms observed range`,
++      state: latencyStatus
++    },
++    {
++      icon: FiActivity,
++      label: 'Jitter consistency',
++      value: `${metrics.jitter} ms`,
++      detail: `${metrics.loadedJitter} ms during active load`,
++      state: jitterStatus
++    },
++    {
++      icon: FiTrendingUp,
++      label: 'Loaded latency delta',
++      value: `+${loadedDelta} ms`,
++      detail: `${metrics.loadedPing} ms average while saturated`,
++      state: loadedStatus
++    },
++    {
++      icon: FiShield,
++      label: 'Packet delivery',
++      value: `${metrics.loss}% loss`,
++      detail: `${metrics.loadedLoss}% loss during load`,
++      state: lossStatus
++    }
++  ];
++
++  return (
++    <section className="panel diagnostics-panel">
++      <div className="panel-heading">
++        <div>
++          <span className="eyebrow">Detailed diagnostics</span>
++          <h2>Connection quality profile</h2>
++        </div>
++        <span className="diagnostics-id">{report.id}</span>
++      </div>
++
++      <div className="diagnostic-grid">
++        {rows.map((row) => (
++          <div className="diagnostic-item" key={row.label}>
++            <div className="diagnostic-icon">
++              <SafeIcon icon={row.icon} />
++            </div>
++            <div className="diagnostic-copy">
++              <span>{row.label}</span>
++              <strong>{row.value}</strong>
++              <small>{row.detail}</small>
++            </div>
++            <b className={row.state === 'Healthy' ? 'healthy' : 'review'}>
++              {row.state}
++            </b>
++          </div>
++        ))}
++      </div>
++
++      <p className="diagnostic-note">
++        Bufferbloat measures the increase in latency when your connection is carrying
++        heavy download and upload traffic. Lower increases indicate a more responsive
++        connection for calls, meetings, and interactive cloud applications.
++      </p>
++    </section>
++  );
++}
+\ No newline at end of file
+diff --git a/src/components/Header.jsx b/src/components/Header.jsx
+new file mode 100644
+index 0000000..ba7031c
+--- /dev/null
++++ b/src/components/Header.jsx
+@@ -0,0 +1,22 @@
++import * as FiIcons from 'react-icons/fi';
++import SafeIcon from '../common/SafeIcon';
++
++const { FiActivity, FiShield, FiLock } = FiIcons;
++
++export default function Header() {
++  return (
++    <header className="header">
++      <div className="brand">
++        <span className="brand-mark"><SafeIcon icon={FiActivity} /></span>
++        <div>
++          <strong>SpeedReport<span>.org</span></strong>
++          <small>Enterprise network diagnostics</small>
++        </div>
++      </div>
++      <div className="trust">
++        <span><SafeIcon icon={FiShield} /> Edge tested</span>
++        <span><SafeIcon icon={FiLock} /> Private by design</span>
++      </div>
++    </header>
++  );
++}
+\ No newline at end of file
+diff --git a/src/components/ISPDetailsCard.jsx b/src/components/ISPDetailsCard.jsx
+new file mode 100644
+index 0000000..e20df58
+--- /dev/null
++++ b/src/components/ISPDetailsCard.jsx
+@@ -0,0 +1,55 @@
++import { useState } from 'react';
++import * as FiIcons from 'react-icons/fi';
++import SafeIcon from '../common/SafeIcon';
++
++const { FiServer, FiEye, FiEyeOff, FiMapPin } = FiIcons;
++
++const maskIp = (ip) => {
++  if (!ip || ip === 'Unknown') return 'Awaiting test';
++  return ip.includes(':') ? `${ip.slice(0, 7)}••••` : ip.replace(/\d+$/, '•••');
++};
++
++export default function ISPDetailsCard({ meta }) {
++  const [visible, setVisible] = useState(false);
++
++  return (
++    <section className="panel">
++      <div className="panel-heading">
++        <div>
++          <span className="eyebrow">Network path</span>
++          <h2>Connection details</h2>
++        </div>
++        <SafeIcon icon={FiServer} />
++      </div>
++
++      <dl className="detail-list">
++        <div>
++          <dt>Provider</dt>
++          <dd>{meta?.isp || 'Detected when test starts'}</dd>
++        </div>
++        <div>
++          <dt>Public IP</dt>
++          <dd className="ip">
++            {visible ? meta?.ip : maskIp(meta?.ip)}
++            {meta?.ip && (
++              <button onClick={() => setVisible((current) => !current)} aria-label="Toggle IP visibility">
++                <SafeIcon icon={visible ? FiEyeOff : FiEye} />
++              </button>
++            )}
++          </dd>
++        </div>
++        <div>
++          <dt>Network</dt>
++          <dd>{meta ? `AS${meta.asn}` : '—'}</dd>
++        </div>
++        <div>
++          <dt>Edge node</dt>
++          <dd>
++            <SafeIcon icon={FiMapPin} />
++            {meta ? `${meta.city}, ${meta.country} · ${meta.colo}` : '—'}
++          </dd>
++        </div>
++      </dl>
++    </section>
++  );
++}
+\ No newline at end of file
+diff --git a/src/components/MetricsGrid.jsx b/src/components/MetricsGrid.jsx
+new file mode 100644
+index 0000000..9afacea
+--- /dev/null
++++ b/src/components/MetricsGrid.jsx
+@@ -0,0 +1,43 @@
++import * as FiIcons from 'react-icons/fi';
++import SafeIcon from '../common/SafeIcon';
++
++const {
++  FiDownload,
++  FiUpload,
++  FiClock,
++  FiZap,
++  FiActivity,
++  FiWifi
++} = FiIcons;
++
++export default function MetricsGrid({ metrics }) {
++  const items = [
++    ['Download', metrics.download.toFixed(1), 'Mbps', FiDownload],
++    ['Upload', metrics.upload.toFixed(1), 'Mbps', FiUpload],
++    ['Idle latency', metrics.ping.toFixed(1), 'ms', FiClock],
++    ['Jitter', metrics.jitter.toFixed(1), 'ms variance', FiActivity],
++    [
++      'Bufferbloat',
++      metrics.bufferbloat,
++      metrics.loadedPing ? `${metrics.loadedPing} ms loaded` : 'grade',
++      FiZap
++    ],
++    ['Packet loss', metrics.loss.toFixed(1), '%', FiWifi]
++  ];
++
++  return (
++    <section className="metrics-grid">
++      {items.map(([label, value, unit, icon]) => (
++        <div className="metric-card" key={label}>
++          <div className="metric-top">
++            <SafeIcon icon={icon} />
++            <span>{label}</span>
++          </div>
++          <div className="metric-value">
++            {value} <small>{unit}</small>
++          </div>
++        </div>
++      ))}
++    </section>
++  );
++}
+\ No newline at end of file
+diff --git a/src/components/ReportCard.jsx b/src/components/ReportCard.jsx
+new file mode 100644
+index 0000000..fb390c9
+--- /dev/null
++++ b/src/components/ReportCard.jsx
+@@ -0,0 +1,104 @@
++import { useState } from 'react';
++import * as FiIcons from 'react-icons/fi';
++import SafeIcon from '../common/SafeIcon';
++import { downloadJsonReport, printReport } from '../utils/reportActions';
++import { downloadReport } from '../utils/pdfReportGenerator';
++
++const {
++  FiDownload,
++  FiFileText,
++  FiPrinter,
++  FiShield,
++  FiCode
++} = FiIcons;
++
++export default function ReportCard({ report }) {
++  const [isDownloading, setIsDownloading] = useState(false);
++  const [message, setMessage] = useState('');
++  const [error, setError] = useState('');
++
++  if (!report) return null;
++
++  const runAction = (action, successMessage) => {
++    setError('');
++    setMessage('');
++
++    try {
++      action();
++      setMessage(successMessage);
++      window.setTimeout(() => setMessage(''), 2400);
++    } catch {
++      setError('This action was blocked by the browser.');
++    }
++  };
++
++  const handlePdfDownload = async () => {
++    setError('');
++    setMessage('');
++    setIsDownloading(true);
++
++    try {
++      await downloadReport(report);
++      setMessage('PDF report downloaded.');
++    } catch {
++      setError('The PDF could not be generated in this browser.');
++    } finally {
++      setIsDownloading(false);
++    }
++  };
++
++  return (
++    <section className="report-card">
++      <div className="report-icon">
++        <SafeIcon icon={FiFileText} />
++      </div>
++
++      <div className="report-copy">
++        <span className="eyebrow">Verification certificate ready</span>
++        <h2>Your official network report</h2>
++        <p>
++          Document performance, network identity, test node, and business readiness
++          for IT or ISP review.
++        </p>
++        <span className="certificate">
++          <SafeIcon icon={FiShield} /> {report.id}
++        </span>
++        {message && <small className="report-success">{message}</small>}
++        {error && <small className="report-error">{error}</small>}
++      </div>
++
++      <div className="report-actions">
++        <button
++          className="report-button"
++          onClick={handlePdfDownload}
++          disabled={isDownloading}
++        >
++          <SafeIcon icon={FiDownload} />
++          {isDownloading ? 'Preparing PDF…' : 'Download PDF'}
++        </button>
++
++        <button
++          className="report-button secondary"
++          onClick={() => runAction(
++            () => printReport(report),
++            'Print dialog opened.'
++          )}
++        >
++          <SafeIcon icon={FiPrinter} />
++          Print
++        </button>
++
++        <button
++          className="report-button secondary"
++          onClick={() => runAction(
++            () => downloadJsonReport(report),
++            'JSON data downloaded.'
++          )}
++        >
++          <SafeIcon icon={FiCode} />
++          JSON
++        </button>
++      </div>
++    </section>
++  );
++}
+\ No newline at end of file
+diff --git a/src/components/ReportComparisonCard.css b/src/components/ReportComparisonCard.css
+new file mode 100644
+index 0000000..e790c92
+--- /dev/null
++++ b/src/components/ReportComparisonCard.css
+@@ -0,0 +1,101 @@
++.comparison-panel {
++  margin-top: 18px;
++}
++
++.comparison-description,
++.comparison-footnote {
++  color: #718097;
++  font-size: 11px;
++  line-height: 1.6;
++}
++
++.comparison-description {
++  margin-top: 16px;
++}
++
++.comparison-reports {
++  display: flex;
++  flex-wrap: wrap;
++  gap: 8px;
++  margin-top: 16px;
++}
++
++.comparison-reports span {
++  padding: 6px 9px;
++  border: 1px solid #283852;
++  border-radius: 6px;
++  color: #88a5d6;
++  background: rgba(37, 99, 235, .08);
++  font: 600 9px monospace;
++}
++
++.comparison-list {
++  margin-top: 17px;
++}
++
++.comparison-row {
++  display: grid;
++  grid-template-columns: 1fr 1fr auto;
++  align-items: center;
++  gap: 12px;
++  padding: 12px 0;
++  border-top: 1px solid #1c2634;
++  font-size: 11px;
++}
++
++.comparison-row > span {
++  color: #8491a5;
++}
++
++.comparison-row strong {
++  color: #e1e9f7;
++}
++
++.comparison-delta {
++  display: inline-flex;
++  align-items: center;
++  justify-content: flex-end;
++  gap: 4px;
++  min-width: 62px;
++  font-size: 10px;
++  font-weight: 700;
++}
++
++.comparison-delta svg {
++  font-size: 12px;
++}
++
++.comparison-delta.positive {
++  color: #45d6a0;
++}
++
++.comparison-delta.negative {
++  color: #f1b567;
++}
++
++.comparison-delta.neutral {
++  color: #718097;
++}
++
++.comparison-footnote {
++  margin-top: 15px;
++  padding-top: 14px;
++  border-top: 1px solid #1c2634;
++  font-size: 10px;
++}
++
++@media (max-width: 520px) {
++  .comparison-row {
++    grid-template-columns: 1fr auto;
++  }
++
++  .comparison-row strong {
++    grid-column: 2;
++    grid-row: 1;
++  }
++
++  .comparison-delta {
++    grid-column: 1 / -1;
++    justify-content: flex-start;
++  }
++}
+\ No newline at end of file
+diff --git a/src/components/ReportComparisonCard.jsx b/src/components/ReportComparisonCard.jsx
+new file mode 100644
+index 0000000..622317d
+--- /dev/null
++++ b/src/components/ReportComparisonCard.jsx
+@@ -0,0 +1,96 @@
++import * as FiIcons from 'react-icons/fi';
++import SafeIcon from '../common/SafeIcon';
++import './ReportComparisonCard.css';
++
++const { FiArrowDown, FiArrowUp, FiMinus, FiGitCompare } = FiIcons;
++
++function difference(current, previous) {
++  return Number(current - previous).toFixed(1);
++}
++
++function Delta({ value, inverse = false }) {
++  const numericValue = Number(value);
++  const improved = inverse ? numericValue < 0 : numericValue > 0;
++  const unchanged = numericValue === 0;
++  const Icon = unchanged ? FiMinus : improved ? FiArrowUp : FiArrowDown;
++
++  return (
++    <span className={`comparison-delta ${unchanged ? 'neutral' : improved ? 'positive' : 'negative'}`}>
++      <SafeIcon icon={Icon} />
++      {numericValue > 0 ? '+' : ''}
++      {value}
++    </span>
++  );
++}
++
++export default function ReportComparisonCard({ currentReport, previousReport }) {
++  if (!currentReport || !previousReport || currentReport.id === previousReport.id) {
++    return null;
++  }
++
++  const rows = [
++    {
++      label: 'Download',
++      current: `${currentReport.metrics.download} Mbps`,
++      delta: difference(currentReport.metrics.download, previousReport.metrics.download)
++    },
++    {
++      label: 'Upload',
++      current: `${currentReport.metrics.upload} Mbps`,
++      delta: difference(currentReport.metrics.upload, previousReport.metrics.upload)
++    },
++    {
++      label: 'Idle latency',
++      current: `${currentReport.metrics.ping} ms`,
++      delta: difference(currentReport.metrics.ping, previousReport.metrics.ping),
++      inverse: true
++    },
++    {
++      label: 'Jitter',
++      current: `${currentReport.metrics.jitter} ms`,
++      delta: difference(currentReport.metrics.jitter, previousReport.metrics.jitter),
++      inverse: true
++    },
++    {
++      label: 'Packet loss',
++      current: `${currentReport.metrics.loss}%`,
++      delta: difference(currentReport.metrics.loss, previousReport.metrics.loss),
++      inverse: true
++    }
++  ];
++
++  return (
++    <section className="panel comparison-panel">
++      <div className="panel-heading">
++        <div>
++          <span className="eyebrow">Historical analysis</span>
++          <h2>What changed?</h2>
++        </div>
++        <SafeIcon icon={FiGitCompare} />
++      </div>
++
++      <p className="comparison-description">
++        Current results compared with your previous saved diagnostic.
++      </p>
++
++      <div className="comparison-reports">
++        <span>Current · {currentReport.id}</span>
++        <span>Previous · {previousReport.id}</span>
++      </div>
++
++      <div className="comparison-list">
++        {rows.map((row) => (
++          <div className="comparison-row" key={row.label}>
++            <span>{row.label}</span>
++            <strong>{row.current}</strong>
++            <Delta value={row.delta} inverse={row.inverse} />
++          </div>
++        ))}
++      </div>
++
++      <p className="comparison-footnote">
++        For latency, jitter, and packet loss, a negative change indicates improvement.
++      </p>
++    </section>
++  );
++}
+\ No newline at end of file
+diff --git a/src/components/ReportShareCard.css b/src/components/ReportShareCard.css
+new file mode 100644
+index 0000000..6529b9f
+--- /dev/null
++++ b/src/components/ReportShareCard.css
+@@ -0,0 +1,114 @@
++.share-card {
++  display: flex;
++  flex-direction: column;
++  gap: 14px;
++  margin-top: 18px;
++  padding: 23px 25px;
++  border: 1px solid #26364e;
++  border-radius: 18px;
++  background: rgba(15, 22, 34, .72);
++}
++
++.share-card-heading {
++  display: flex;
++  align-items: center;
++  gap: 13px;
++}
++
++.share-card-heading h2 {
++  margin-top: 5px;
++  font: 700 18px 'Manrope';
++}
++
++.share-card-icon {
++  display: grid;
++  place-items: center;
++  width: 42px;
++  height: 42px;
++  border-radius: 11px;
++  color: #7eadff;
++  background: rgba(48, 116, 229, .16);
++}
++
++.share-card p {
++  max-width: 720px;
++  color: #77869b;
++  font-size: 11px;
++  line-height: 1.65;
++}
++
++.share-link-row {
++  display: flex;
++  gap: 8px;
++}
++
++.share-link-row input {
++  min-width: 0;
++  flex: 1;
++  padding: 12px 13px;
++  border: 1px solid #29384e;
++  border-radius: 9px;
++  outline: none;
++  color: #a9c6f7;
++  background: #0a111d;
++  font: 10px monospace;
++}
++
++.share-link-row input:focus {
++  border-color: #397bea;
++}
++
++.share-action {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  gap: 7px;
++  padding: 0 14px;
++  border: 0;
++  border-radius: 9px;
++  color: #fff;
++  background: #286ddd;
++  cursor: pointer;
++  font-size: 10px;
++  font-weight: 700;
++  white-space: nowrap;
++}
++
++.share-action.secondary {
++  color: #9cb3d6;
++  background: #182438;
++}
++
++.share-action:hover {
++  filter: brightness(1.12);
++}
++
++.share-error {
++  color: #f5bc6e;
++  font-size: 10px;
++}
++
++.return-link {
++  align-self: flex-start;
++  padding: 0;
++  border: 0;
++  color: #719bea;
++  background: transparent;
++  cursor: pointer;
++  font-size: 10px;
++}
++
++@media (max-width: 620px) {
++  .share-link-row {
++    flex-direction: column;
++  }
++
++  .share-link-row input {
++    width: 100%;
++    min-height: 39px;
++  }
++
++  .share-action {
++    min-height: 39px;
++  }
++}
+\ No newline at end of file
+diff --git a/src/components/ReportShareCard.jsx b/src/components/ReportShareCard.jsx
+new file mode 100644
+index 0000000..0db8cee
+--- /dev/null
++++ b/src/components/ReportShareCard.jsx
+@@ -0,0 +1,101 @@
++import { useState } from 'react';
++import * as FiIcons from 'react-icons/fi';
++import SafeIcon from '../common/SafeIcon';
++import {
++  clearReportFromUrl,
++  createReportShareUrl
++} from '../utils/reportShareLinks';
++import './ReportShareCard.css';
++
++const { FiCheck, FiCopy, FiLink, FiShare2 } = FiIcons;
++
++export default function ReportShareCard({ report, isShared }) {
++  const [copied, setCopied] = useState(false);
++  const [error, setError] = useState('');
++
++  if (!report) return null;
++
++  const shareUrl = createReportShareUrl(report);
++
++  const copyLink = async () => {
++    setError('');
++
++    try {
++      await navigator.clipboard.writeText(shareUrl);
++      setCopied(true);
++      window.setTimeout(() => setCopied(false), 2200);
++    } catch {
++      setError('Copy was blocked. Select and copy the link manually.');
++    }
++  };
++
++  const shareReport = async () => {
++    setError('');
++
++    if (!navigator.share) {
++      await copyLink();
++      return;
++    }
++
++    try {
++      await navigator.share({
++        title: `SpeedReport ${report.id}`,
++        text: 'View this verified network performance report.',
++        url: shareUrl
++      });
++    } catch (reason) {
++      if (reason?.name !== 'AbortError') {
++        setError('The report could not be shared from this browser.');
++      }
++    }
++  };
++
++  const returnToLocalReport = () => {
++    clearReportFromUrl();
++    window.location.reload();
++  };
++
++  return (
++    <section className="share-card">
++      <div className="share-card-heading">
++        <div className="share-card-icon">
++          <SafeIcon icon={FiLink} />
++        </div>
++        <div>
++          <span className="eyebrow">Private browser sharing</span>
++          <h2>{isShared ? 'Shared report opened' : 'Share this report'}</h2>
++        </div>
++      </div>
++
++      <p>
++        Create a read-only link containing this report in the URL fragment.
++        Nothing is uploaded or stored on a server.
++      </p>
++
++      <div className="share-link-row">
++        <input
++          value={shareUrl}
++          readOnly
++          aria-label="Report share link"
++          onFocus={(event) => event.target.select()}
++        />
++        <button className="share-action" onClick={copyLink}>
++          <SafeIcon icon={copied ? FiCheck : FiCopy} />
++          {copied ? 'Copied' : 'Copy link'}
++        </button>
++        <button className="share-action secondary" onClick={shareReport}>
++          <SafeIcon icon={FiShare2} />
++          Share
++        </button>
++      </div>
++
++      {error && <small className="share-error">{error}</small>}
++
++      {isShared && (
++        <button className="return-link" onClick={returnToLocalReport}>
++          Return to this browser’s latest report
++        </button>
++      )}
++    </section>
++  );
++}
+\ No newline at end of file
+diff --git a/src/components/SpeedGauge.jsx b/src/components/SpeedGauge.jsx
+new file mode 100644
+index 0000000..0d91ca9
+--- /dev/null
++++ b/src/components/SpeedGauge.jsx
+@@ -0,0 +1,94 @@
++import { motion } from 'framer-motion';
++import * as FiIcons from 'react-icons/fi';
++import SafeIcon from '../common/SafeIcon';
++import { PHASE_LABELS, STATES } from '../common/testConstants';
++
++const { FiPlay, FiRefreshCw, FiStopCircle } = FiIcons;
++
++function formatSpeed(value) {
++  if (value >= 1000) {
++    return `${(value / 1000).toFixed(2)} Gbps`;
++  }
++
++  return `${value.toFixed(1)} Mbps`;
++}
++
++export default function SpeedGauge({
++  state,
++  metrics,
++  samples,
++  onStart,
++  onCancel
++}) {
++  const active = ![STATES.IDLE, STATES.COMPLETE, STATES.ERROR].includes(state);
++  const value = state === STATES.UPLOAD ? metrics.upload : metrics.download;
++  const percent = Math.min(value / 10, 100);
++  const points = samples.length
++    ? samples
++      .map((sample, index) => (
++        `${(index / Math.max(samples.length - 1, 1)) * 280},${55 - Math.min(sample / 20, 48)}`
++      ))
++      .join(' ')
++    : '0,54 280,54';
++
++  return (
++    <section className="gauge-card">
++      <div className="status-line">
++        <span className={active ? 'pulse-dot active' : 'pulse-dot'} />
++        {PHASE_LABELS[state]}
++      </div>
++
++      <div className="gauge">
++        <svg viewBox="0 0 240 145" aria-label={`${value} megabits per second`}>
++          <path className="gauge-track" d="M25 120 A95 95 0 0 1 215 120" />
++          <motion.path
++            className="gauge-progress"
++            d="M25 120 A95 95 0 0 1 215 120"
++            initial={{ pathLength: 0 }}
++            animate={{ pathLength: percent / 100 }}
++            transition={{ duration: 0.45 }}
++          />
++        </svg>
++
++        <div className="gauge-value">
++          <strong>{value.toFixed(1)}</strong>
++          <span>{formatSpeed(value).split(' ').slice(1).join(' ') || 'Mbps'}</span>
++          <small>{state === STATES.UPLOAD ? 'UPLOAD' : 'DOWNLOAD'}</small>
++        </div>
++      </div>
++
++      <svg
++        className="sparkline"
++        viewBox="0 0 280 60"
++        preserveAspectRatio="none"
++        aria-label="Live speed samples"
++      >
++        <polyline points={points} />
++      </svg>
++
++      {active ? (
++        <button
++          className="primary-button cancel-button"
++          onClick={onCancel}
++          type="button"
++        >
++          <SafeIcon icon={FiStopCircle} />
++          Stop diagnostic
++        </button>
++      ) : (
++        <button
++          className="primary-button"
++          onClick={onStart}
++          type="button"
++        >
++          <SafeIcon icon={state === STATES.IDLE ? FiPlay : FiRefreshCw} />
++          {state === STATES.IDLE ? 'Start speed test' : 'Run test again'}
++        </button>
++      )}
++
++      <p className="test-note">
++        Uses multiple edge streams and approximately 60 MB of test traffic.
++      </p>
++    </section>
++  );
++}
+\ No newline at end of file
+diff --git a/src/components/TestHistoryVault.css b/src/components/TestHistoryVault.css
+new file mode 100644
+index 0000000..12f6597
+--- /dev/null
++++ b/src/components/TestHistoryVault.css
+@@ -0,0 +1,30 @@
++.history-actions {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++}
++
++.history-view {
++  display: grid;
++  place-items: center;
++  width: 24px;
++  height: 24px;
++  padding: 0;
++  border: 0;
++  border-radius: 6px;
++  color: #719bea;
++  background: transparent;
++  cursor: pointer;
++}
++
++.history-view:hover {
++  color: #b6d0ff;
++  background: rgba(71, 126, 229, .14);
++}
++
++.history-footnote {
++  margin-top: 15px;
++  color: #56667c;
++  font-size: 10px;
++  line-height: 1.5;
++}
+\ No newline at end of file
+diff --git a/src/components/TestHistoryVault.jsx b/src/components/TestHistoryVault.jsx
+new file mode 100644
+index 0000000..ea3d454
+--- /dev/null
++++ b/src/components/TestHistoryVault.jsx
+@@ -0,0 +1,127 @@
++import * as FiIcons from 'react-icons/fi';
++import SafeIcon from '../common/SafeIcon';
++import { downloadHistoryCsv } from '../utils/reportActions';
++import './TestHistoryVault.css';
++
++const {
++  FiArchive,
++  FiDownload,
++  FiEye,
++  FiTrash2,
++  FiTrendingUp
++} = FiIcons;
++
++function getBarHeight(value, maximum) {
++  if (!maximum) return 8;
++  return Math.max(10, Math.round((value / maximum) * 100));
++}
++
++function formatDate(timestamp) {
++  return new Date(timestamp).toLocaleDateString([], {
++    month: 'short',
++    day: 'numeric'
++  });
++}
++
++export default function TestHistoryVault({ history, onClear, onSelect }) {
++  const maximum = Math.max(
++    ...history.map((test) => test.metrics.download),
++    1
++  );
++
++  const exportHistory = () => {
++    try {
++      downloadHistoryCsv(history);
++    } catch {
++      // Browser download permissions can block this action.
++    }
++  };
++
++  return (
++    <section className="panel history-panel">
++      <div className="panel-heading">
++        <div>
++          <span className="eyebrow">Stored on this device</span>
++          <h2>Past tests</h2>
++        </div>
++
++        {history.length > 0 && (
++          <div className="history-actions">
++            <button className="icon-button" onClick={exportHistory}>
++              <SafeIcon icon={FiDownload} />
++              CSV
++            </button>
++            <button className="icon-button" onClick={onClear}>
++              <SafeIcon icon={FiTrash2} />
++              Clear
++            </button>
++          </div>
++        )}
++      </div>
++
++      {history.length === 0 ? (
++        <div className="empty-state">
++          <SafeIcon icon={FiArchive} />
++          <p>Your completed tests will appear here.</p>
++        </div>
++      ) : (
++        <>
++          <div className="history-chart">
++            <div className="chart-label">
++              <SafeIcon icon={FiTrendingUp} />
++              Download trend
++            </div>
++
++            <div className="bars">
++              {history.slice(0, 10).reverse().map((test) => (
++                <div className="bar-column" key={`bar-${test.id}`}>
++                  <div
++                    className="bar"
++                    style={{
++                      height: `${getBarHeight(
++                        test.metrics.download,
++                        maximum
++                      )}%`
++                    }}
++                    title={`${test.metrics.download} Mbps`}
++                  />
++                </div>
++              ))}
++            </div>
++          </div>
++
++          <div className="history-table">
++            <div className="history-head">
++              <span>Date</span>
++              <span>Down</span>
++              <span>Up</span>
++              <span>Ping</span>
++              <span>View</span>
++            </div>
++
++            {history.slice(0, 6).map((test) => (
++              <div className="history-row" key={test.id}>
++                <span title={test.id}>{formatDate(test.timestamp)}</span>
++                <strong>{test.metrics.download}</strong>
++                <strong>{test.metrics.upload}</strong>
++                <span>{test.metrics.ping} ms</span>
++                <button
++                  className="history-view"
++                  onClick={() => onSelect(test)}
++                  aria-label={`View report ${test.id}`}
++                >
++                  <SafeIcon icon={FiEye} />
++                </button>
++              </div>
++            ))}
++          </div>
++
++          <p className="history-footnote">
++            {history.length} report{history.length === 1 ? '' : 's'} saved locally.
++            Export CSV to analyze the full device history.
++          </p>
++        </>
++      )}
++    </section>
++  );
++}
+\ No newline at end of file
+diff --git a/src/hooks/useLocalVault.js b/src/hooks/useLocalVault.js
+new file mode 100644
+index 0000000..e8904e4
+--- /dev/null
++++ b/src/hooks/useLocalVault.js
+@@ -0,0 +1,45 @@
++import { useCallback, useEffect, useState } from 'react';
++
++const STORAGE_KEY = 'speedreport-history-v1';
++const MAX_HISTORY = 20;
++
++function readReports() {
++  try {
++    const stored = localStorage.getItem(STORAGE_KEY);
++    const parsed = stored ? JSON.parse(stored) : [];
++
++    return Array.isArray(parsed) ? parsed : [];
++  } catch {
++    return [];
++  }
++}
++
++export function useLocalVault() {
++  const [history, setHistory] = useState([]);
++
++  useEffect(() => {
++    setHistory(readReports());
++  }, []);
++
++  const save = useCallback((report) => {
++    setHistory((current) => {
++      const withoutDuplicate = current.filter((item) => item.id !== report.id);
++      const next = [report, ...withoutDuplicate].slice(0, MAX_HISTORY);
++
++      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
++      return next;
++    });
++  }, []);
++
++  const clear = useCallback(() => {
++    localStorage.removeItem(STORAGE_KEY);
++    setHistory([]);
++  }, []);
++
++  return {
++    history,
++    latestReport: history[0] || null,
++    save,
++    clear
++  };
++}
+\ No newline at end of file
+diff --git a/src/hooks/useSpeedTest.js b/src/hooks/useSpeedTest.js
+new file mode 100644
+index 0000000..280f351
+--- /dev/null
++++ b/src/hooks/useSpeedTest.js
+@@ -0,0 +1,134 @@
++import { useCallback, useEffect, useRef, useState } from 'react';
++import { STATES } from '../common/testConstants';
++import {
++  bufferGrade,
++  fetchMeta,
++  measureDownload,
++  measureLoadedPing,
++  measurePing,
++  measureUpload
++} from '../utils/benchmarkEngine';
++import { getReadiness } from '../utils/readiness';
++
++const initialMetrics = {
++  download: 0,
++  upload: 0,
++  ping: 0,
++  jitter: 0,
++  loss: 0,
++  min: 0,
++  max: 0,
++  loadedPing: 0,
++  loadedJitter: 0,
++  loadedLoss: 0,
++  bufferbloat: '—'
++};
++
++export function useSpeedTest(onComplete) {
++  const controllerRef = useRef(null);
++  const [state, setState] = useState(STATES.IDLE);
++  const [metrics, setMetrics] = useState(initialMetrics);
++  const [meta, setMeta] = useState(null);
++  const [samples, setSamples] = useState([]);
++  const [error, setError] = useState('');
++
++  const updateLive = useCallback((key, value) => {
++    setMetrics((current) => ({ ...current, [key]: value }));
++    setSamples((current) => [...current.slice(-24), value]);
++  }, []);
++
++  const cancel = useCallback(() => {
++    controllerRef.current?.abort();
++    controllerRef.current = null;
++    setState(STATES.IDLE);
++    setError('');
++  }, []);
++
++  const start = useCallback(async () => {
++    controllerRef.current?.abort();
++
++    const controller = new AbortController();
++    controllerRef.current = controller;
++
++    setError('');
++    setMeta(null);
++    setMetrics(initialMetrics);
++    setSamples([]);
++
++    try {
++      setState(STATES.PING);
++
++      const [network, idle] = await Promise.all([
++        fetchMeta(controller.signal),
++        measurePing(12, controller.signal)
++      ]);
++
++      setMeta(network);
++      setMetrics((current) => ({ ...current, ...idle }));
++
++      setState(STATES.DOWNLOAD);
++      const download = await measureDownload(
++        (value) => updateLive('download', value),
++        controller.signal
++      );
++      setMetrics((current) => ({ ...current, download }));
++
++      setState(STATES.UPLOAD);
++      const upload = await measureUpload(
++        (value) => updateLive('upload', value),
++        controller.signal
++      );
++      setMetrics((current) => ({ ...current, upload }));
++
++      setState(STATES.BUFFERBLOAT);
++      const loaded = await measureLoadedPing(3500, controller.signal);
++      const delta = Math.max(0, loaded.ping - idle.ping);
++
++      const completeMetrics = {
++        ...idle,
++        download,
++        upload,
++        loadedPing: loaded.ping,
++        loadedJitter: loaded.jitter,
++        loadedLoss: loaded.loss,
++        bufferbloat: bufferGrade(delta)
++      };
++
++      const report = {
++        id: `SR-${Date.now().toString(36).toUpperCase()}`,
++        timestamp: new Date().toISOString(),
++        metrics: completeMetrics,
++        meta: network,
++        readiness: getReadiness(completeMetrics).grade
++      };
++
++      setMetrics(completeMetrics);
++      setState(STATES.COMPLETE);
++      onComplete(report);
++    } catch (reason) {
++      if (reason.name === 'AbortError') {
++        setState(STATES.IDLE);
++        return;
++      }
++
++      setError(reason.message || 'The test could not be completed.');
++      setState(STATES.ERROR);
++    } finally {
++      if (controllerRef.current === controller) {
++        controllerRef.current = null;
++      }
++    }
++  }, [onComplete, updateLive]);
++
++  useEffect(() => () => controllerRef.current?.abort(), []);
++
++  return {
++    state,
++    metrics,
++    meta,
++    samples,
++    error,
++    start,
++    cancel
++  };
++}
+\ No newline at end of file
+diff --git a/src/index.css b/src/index.css
+new file mode 100644
+index 0000000..5e78063
+--- /dev/null
++++ b/src/index.css
+@@ -0,0 +1,28 @@
++@tailwind base;
++@tailwind components;
++@tailwind utilities;
++
++* {
++  margin: 0;
++  padding: 0;
++  box-sizing: border-box;
++}
++
++html {
++  background: #080c14;
++  scroll-behavior: smooth;
++}
++
++body {
++  -webkit-font-smoothing: antialiased;
++  -moz-osx-font-smoothing: grayscale;
++}
++
++button, a {
++  -webkit-tap-highlight-color: transparent;
++}
++
++#root {
++  width: 100%;
++  min-height: 100vh;
++}
+\ No newline at end of file
+diff --git a/src/main.jsx b/src/main.jsx
+new file mode 100644
+index 0000000..160d24a
+--- /dev/null
++++ b/src/main.jsx
+@@ -0,0 +1,10 @@
++import { StrictMode } from 'react';
++import { createRoot } from 'react-dom/client';
++import App from './App.jsx';
++import './index.css';
++
++createRoot(document.getElementById('root')).render(
++<StrictMode>
++    <App />
++</StrictMode>
++);
+\ No newline at end of file
+diff --git a/src/utils/benchmarkEngine.js b/src/utils/benchmarkEngine.js
+new file mode 100644
+index 0000000..58c7a59
+--- /dev/null
++++ b/src/utils/benchmarkEngine.js
+@@ -0,0 +1,290 @@
++import { API_BASE } from '../common/testConstants';
++
++const round = (value, digits = 1) => Number(value.toFixed(digits));
++
++const endpoint = (path, params = '') =>
++  `${API_BASE}${path}${params}${params ? '&' : '?'}t=${Date.now()}`;
++
++function requestOptions(signal) {
++  return {
++    cache: 'no-store',
++    signal
++  };
++}
++
++function throwIfAborted(signal) {
++  if (signal?.aborted) {
++    throw new DOMException('The diagnostic was cancelled.', 'AbortError');
++  }
++}
++
++export async function fetchMeta(signal) {
++  const response = await fetch(endpoint('/api/meta'), requestOptions(signal));
++
++  if (!response.ok) {
++    throw new Error('Metadata service unavailable');
++  }
++
++  return response.json();
++}
++
++export async function measurePing(samples = 10, signal) {
++  const readings = [];
++  let lost = 0;
++
++  for (let index = 0; index < samples; index += 1) {
++    throwIfAborted(signal);
++
++    const started = performance.now();
++
++    try {
++      const response = await fetch(endpoint('/api/ping'), {
++        ...requestOptions(signal),
++        signal: signal || AbortSignal.timeout(5000)
++      });
++
++      if (!response.ok) {
++        throw new Error('Ping failed');
++      }
++
++      readings.push(performance.now() - started);
++    } catch (error) {
++      if (error.name === 'AbortError') {
++        throw error;
++      }
++
++      lost += 1;
++    }
++  }
++
++  if (!readings.length) {
++    throw new Error('Edge testing service is unreachable');
++  }
++
++  const average = readings.reduce((sum, value) => sum + value, 0) / readings.length;
++  const variance = readings.reduce(
++    (sum, value) => sum + ((value - average) ** 2),
++    0
++  ) / readings.length;
++
++  return {
++    ping: round(average),
++    jitter: round(Math.sqrt(variance)),
++    loss: round((lost / samples) * 100),
++    min: round(Math.min(...readings)),
++    max: round(Math.max(...readings))
++  };
++}
++
++async function consumeDownload(bytes, onBytes, signal) {
++  const response = await fetch(
++    endpoint('/api/download', `?bytes=${bytes}`),
++    requestOptions(signal)
++  );
++
++  if (!response.ok || !response.body) {
++    throw new Error('Download endpoint unavailable');
++  }
++
++  const reader = response.body.getReader();
++  let received = 0;
++
++  try {
++    while (true) {
++      throwIfAborted(signal);
++
++      const { done, value } = await reader.read();
++
++      if (done) {
++        break;
++      }
++
++      received += value.byteLength;
++      onBytes(value.byteLength);
++    }
++  } finally {
++    reader.releaseLock();
++  }
++
++  return received;
++}
++
++export async function measureDownload(onProgress = () => {}, signal) {
++  const started = performance.now();
++  let totalBytes = 0;
++
++  const recordBytes = (bytes) => {
++    totalBytes += bytes;
++    const seconds = Math.max((performance.now() - started) / 1000, 0.1);
++    const speed = (totalBytes * 8) / seconds / 1e6;
++    onProgress(round(speed));
++  };
++
++  await Promise.all(
++    Array.from({ length: 4 }, () =>
++      consumeDownload(12 * 1024 * 1024, recordBytes, signal)
++    )
++  );
++
++  return round(
++    (totalBytes * 8) /
++      Math.max((performance.now() - started) / 1000, 0.1) /
++      1e6
++  );
++}
++
++function createUploadPayload(size) {
++  const payload = new Uint8Array(size);
++  const randomBlock = new Uint8Array(65536);
++
++  crypto.getRandomValues(randomBlock);
++
++  for (let offset = 0; offset < payload.length; offset += randomBlock.length) {
++    payload.set(
++      randomBlock.subarray(
++        0,
++        Math.min(randomBlock.length, payload.length - offset)
++      ),
++      offset
++    );
++  }
++
++  return payload;
++}
++
++async function uploadPayload(payload, signal) {
++  const response = await fetch(endpoint('/api/upload'), {
++    method: 'POST',
++    headers: {
++      'Content-Type': 'application/octet-stream',
++      'Cache-Control': 'no-store'
++    },
++    body: payload,
++    signal
++  });
++
++  if (!response.ok) {
++    throw new Error('Upload endpoint unavailable');
++  }
++
++  return payload.byteLength;
++}
++
++export async function measureUpload(onProgress = () => {}, signal) {
++  const payload = createUploadPayload(4 * 1024 * 1024);
++  const started = performance.now();
++  let completedBytes = 0;
++
++  const streams = Array.from({ length: 4 }, async () => {
++    const bytes = await uploadPayload(payload, signal);
++
++    completedBytes += bytes;
++
++    const seconds = Math.max((performance.now() - started) / 1000, 0.1);
++    onProgress(round((completedBytes * 8) / seconds / 1e6));
++
++    return bytes;
++  });
++
++  await Promise.all(streams);
++
++  return round(
++    (completedBytes * 8) /
++      Math.max((performance.now() - started) / 1000, 0.1) /
++      1e6
++  );
++}
++
++async function runBackgroundDownload(signal) {
++  try {
++    await Promise.all(
++      Array.from({ length: 2 }, () =>
++        consumeDownload(6 * 1024 * 1024, () => {}, signal)
++      )
++    );
++  } catch (error) {
++    if (error.name === 'AbortError') {
++      throw error;
++    }
++  }
++}
++
++async function runBackgroundUpload(signal) {
++  try {
++    const payload = createUploadPayload(2 * 1024 * 1024);
++
++    await Promise.all([
++      uploadPayload(payload, signal),
++      uploadPayload(payload, signal)
++    ]);
++  } catch (error) {
++    if (error.name === 'AbortError') {
++      throw error;
++    }
++  }
++}
++
++export async function measureLoadedPing(durationMs = 3500, signal) {
++  const started = performance.now();
++  const readings = [];
++  let lost = 0;
++
++  const loadPromise = Promise.all([
++    runBackgroundDownload(signal),
++    runBackgroundUpload(signal)
++  ]);
++
++  while (performance.now() - started < durationMs) {
++    throwIfAborted(signal);
++
++    const pingStarted = performance.now();
++
++    try {
++      const response = await fetch(endpoint('/api/ping'), {
++        ...requestOptions(signal),
++        signal: signal || AbortSignal.timeout(5000)
++      });
++
++      if (!response.ok) {
++        throw new Error('Loaded ping failed');
++      }
++
++      readings.push(performance.now() - pingStarted);
++    } catch (error) {
++      if (error.name === 'AbortError') {
++        throw error;
++      }
++
++      lost += 1;
++    }
++  }
++
++  await loadPromise;
++
++  if (!readings.length) {
++    throw new Error('Loaded latency could not be measured');
++  }
++
++  const average = readings.reduce((sum, value) => sum + value, 0) / readings.length;
++  const variance = readings.reduce(
++    (sum, value) => sum + ((value - average) ** 2),
++    0
++  ) / readings.length;
++
++  return {
++    ping: round(average),
++    jitter: round(Math.sqrt(variance)),
++    loss: round((lost / Math.max(readings.length + lost, 1)) * 100),
++    min: round(Math.min(...readings)),
++    max: round(Math.max(...readings))
++  };
++}
++
++export function bufferGrade(delta) {
++  if (delta <= 5) return 'A+';
++  if (delta <= 15) return 'A';
++  if (delta <= 30) return 'B';
++  if (delta <= 60) return 'C';
++  if (delta <= 100) return 'D';
++  return 'F';
++}
+\ No newline at end of file
+diff --git a/src/utils/pdfReportGenerator.js b/src/utils/pdfReportGenerator.js
+new file mode 100644
+index 0000000..233595b
+--- /dev/null
++++ b/src/utils/pdfReportGenerator.js
+@@ -0,0 +1,186 @@
++import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
++import { formatDuration, getReadiness } from './readiness';
++
++export async function downloadReport(report) {
++  const pdf = await PDFDocument.create();
++  const page = pdf.addPage([612, 792]);
++  const regular = await pdf.embedFont(StandardFonts.Helvetica);
++  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
++  const { width, height } = page.getSize();
++  const navy = rgb(0.05, 0.08, 0.14);
++  const blue = rgb(0.12, 0.45, 0.95);
++  const muted = rgb(0.35, 0.4, 0.5);
++  const readiness = getReadiness(report.metrics);
++  const loadedDelta = Math.max(
++    0,
++    report.metrics.loadedPing - report.metrics.ping
++  );
++
++  page.drawRectangle({
++    x: 0,
++    y: height - 115,
++    width,
++    height: 115,
++    color: navy
++  });
++
++  page.drawText('SPEEDREPORT.ORG', {
++    x: 42,
++    y: 742,
++    size: 12,
++    font: bold,
++    color: blue
++  });
++
++  page.drawText('Network Verification Certificate', {
++    x: 42,
++    y: 704,
++    size: 25,
++    font: bold,
++    color: rgb(1, 1, 1)
++  });
++
++  page.drawText(`Certificate ${report.id}`, {
++    x: 42,
++    y: 680,
++    size: 10,
++    font: regular,
++    color: rgb(0.7, 0.76, 0.85)
++  });
++
++  const line = (label, value, y) => {
++    page.drawText(label, {
++      x: 42,
++      y,
++      size: 10,
++      font: regular,
++      color: muted
++    });
++
++    page.drawText(String(value), {
++      x: 235,
++      y,
++      size: 11,
++      font: bold,
++      color: navy
++    });
++  };
++
++  page.drawText('CONNECTION DETAILS', {
++    x: 42,
++    y: 635,
++    size: 11,
++    font: bold,
++    color: blue
++  });
++
++  line('Tested', new Date(report.timestamp).toLocaleString(), 610);
++  line('Internet provider', report.meta?.isp || 'Unknown', 588);
++  line(
++    'ASN / Edge node',
++    `AS${report.meta?.asn || 0} / ${report.meta?.colo || 'Unknown'}`,
++    566
++  );
++  line('Public IP', report.meta?.ip || 'Unknown', 544);
++
++  page.drawText('MEASURED PERFORMANCE', {
++    x: 42,
++    y: 500,
++    size: 11,
++    font: bold,
++    color: blue
++  });
++
++  line('Download throughput', `${report.metrics.download} Mbps`, 475);
++  line('Upload throughput', `${report.metrics.upload} Mbps`, 453);
++  line(
++    'Idle latency / Jitter',
++    `${report.metrics.ping} ms / ${report.metrics.jitter} ms`,
++    431
++  );
++  line(
++    'Loaded latency / Jitter',
++    `${report.metrics.loadedPing} ms / ${report.metrics.loadedJitter} ms`,
++    409
++  );
++  line('Loaded latency increase', `+${loadedDelta.toFixed(1)} ms`, 387);
++  line('Packet loss', `${report.metrics.loss}%`, 365);
++  line('Bufferbloat grade', report.metrics.bufferbloat, 343);
++
++  page.drawText('BUSINESS READINESS', {
++    x: 42,
++    y: 298,
++    size: 11,
++    font: bold,
++    color: blue
++  });
++
++  line('Overall assessment', readiness.grade, 273);
++  line(
++    'Estimated HD voice capacity',
++    `${readiness.calls}+ concurrent calls`,
++    251
++  );
++  line(
++    'Estimated office capacity',
++    `${readiness.employees} active employees`,
++    229
++  );
++  line(
++    '1 GB / 10 GB upload',
++    `${formatDuration(readiness.uploadSeconds(1))} / ${formatDuration(readiness.uploadSeconds(10))}`,
++    207
++  );
++
++  page.drawRectangle({
++    x: 42,
++    y: 92,
++    width: width - 84,
++    height: 64,
++    color: rgb(0.94, 0.96, 0.99)
++  });
++
++  page.drawText('Verification note', {
++    x: 58,
++    y: 130,
++    size: 10,
++    font: bold,
++    color: navy
++  });
++
++  page.drawText(
++    'Measurements reflect network conditions at the stated time and edge node.',
++    {
++      x: 58,
++      y: 112,
++      size: 9,
++      font: regular,
++      color: muted
++    }
++  );
++
++  page.drawText(
++    'Generated locally in your browser. No report data was uploaded or retained.',
++    {
++      x: 42,
++      y: 54,
++      size: 9,
++      font: regular,
++      color: muted
++    }
++  );
++
++  const bytes = await pdf.save();
++  const url = URL.createObjectURL(
++    new Blob([bytes], { type: 'application/pdf' })
++  );
++  const anchor = document.createElement('a');
++
++  anchor.href = url;
++  anchor.download = `SpeedReport-${report.id}.pdf`;
++  document.body.appendChild(anchor);
++  anchor.click();
++  anchor.remove();
++
++  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
++}
+\ No newline at end of file
+diff --git a/src/utils/readiness.js b/src/utils/readiness.js
+new file mode 100644
+index 0000000..80df8ca
+--- /dev/null
++++ b/src/utils/readiness.js
+@@ -0,0 +1,18 @@
++export function getReadiness(metrics) {
++  const calls = Math.max(1, Math.floor(Math.min(metrics.upload / 0.12, 250)));
++  const employees = Math.max(1, Math.floor(Math.min(metrics.download / 8, metrics.upload / 3)));
++  const strongLatency = metrics.ping < 50 && metrics.jitter < 10 && metrics.loss < 1;
++  const strongVideo = metrics.upload >= 15 && ['A+', 'A', 'B'].includes(metrics.bufferbloat);
++  const score = [strongLatency, strongVideo, metrics.download >= 100, metrics.upload >= 25]
++    .filter(Boolean).length;
++  const grade = score >= 4 ? 'Enterprise Ready' : score >= 2 ? 'Business Suitable' : 'Needs Improvement';
++  const uploadSeconds = (gb) => metrics.upload ? Math.ceil((gb * 8000) / metrics.upload) : 0;
++  return { calls, employees, strongLatency, strongVideo, grade, uploadSeconds };
++}
++
++export function formatDuration(seconds) {
++  if (!seconds) return '—';
++  if (seconds < 60) return `${seconds}s`;
++  const minutes = Math.floor(seconds / 60);
++  return `${minutes}m ${seconds % 60}s`;
++}
+\ No newline at end of file
+diff --git a/src/utils/reportActions.js b/src/utils/reportActions.js
+new file mode 100644
+index 0000000..a27ecab
+--- /dev/null
++++ b/src/utils/reportActions.js
+@@ -0,0 +1,237 @@
++function createDownloadUrl(content, type) {
++  return URL.createObjectURL(new Blob([content], { type }));
++}
++
++function triggerDownload(content, type, filename) {
++  const url = createDownloadUrl(content, type);
++  const anchor = document.createElement('a');
++
++  anchor.href = url;
++  anchor.download = filename;
++  document.body.appendChild(anchor);
++  anchor.click();
++  anchor.remove();
++
++  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
++}
++
++export function downloadJsonReport(report) {
++  const content = JSON.stringify(report, null, 2);
++
++  triggerDownload(
++    content,
++    'application/json',
++    `SpeedReport-${report.id}.json`
++  );
++}
++
++function escapeCsvValue(value) {
++  const text = String(value ?? '');
++
++  if (/[",\n]/.test(text)) {
++    return `"${text.replace(/"/g, '""')}"`;
++  }
++
++  return text;
++}
++
++export function downloadHistoryCsv(history) {
++  const headers = [
++    'Report ID',
++    'Timestamp',
++    'Provider',
++    'Download Mbps',
++    'Upload Mbps',
++    'Idle Latency ms',
++    'Jitter ms',
++    'Loaded Latency ms',
++    'Loaded Jitter ms',
++    'Packet Loss %',
++    'Loaded Packet Loss %',
++    'Bufferbloat',
++    'Readiness'
++  ];
++
++  const rows = history.map((report) => [
++    report.id,
++    report.timestamp,
++    report.meta?.isp || 'Unknown',
++    report.metrics.download,
++    report.metrics.upload,
++    report.metrics.ping,
++    report.metrics.jitter,
++    report.metrics.loadedPing,
++    report.metrics.loadedJitter,
++    report.metrics.loss,
++    report.metrics.loadedLoss,
++    report.metrics.bufferbloat,
++    report.readiness || 'Not recorded'
++  ]);
++
++  const content = [headers, ...rows]
++    .map((row) => row.map(escapeCsvValue).join(','))
++    .join('\n');
++
++  triggerDownload(
++    content,
++    'text/csv;charset=utf-8',
++    `SpeedReport-history-${new Date().toISOString().slice(0, 10)}.csv`
++  );
++}
++
++function addText(documentRef, parent, tag, text, className = '') {
++  const element = documentRef.createElement(tag);
++  element.textContent = text;
++
++  if (className) {
++    element.className = className;
++  }
++
++  parent.appendChild(element);
++}
++
++export function printReport(report) {
++  const printWindow = window.open('', '_blank', 'width=900,height=900');
++
++  if (!printWindow) {
++    throw new Error('Print window was blocked');
++  }
++
++  const documentRef = printWindow.document;
++  const style = documentRef.createElement('style');
++
++  style.textContent = `
++    * { box-sizing: border-box; }
++    body {
++      margin: 0;
++      padding: 42px;
++      color: #172033;
++      font-family: Arial, sans-serif;
++      line-height: 1.45;
++    }
++    header {
++      display: flex;
++      justify-content: space-between;
++      gap: 30px;
++      padding-bottom: 24px;
++      border-bottom: 3px solid #2563eb;
++    }
++    h1 { margin: 0 0 5px; font-size: 28px; }
++    h2 {
++      margin: 30px 0 12px;
++      color: #2563eb;
++      font-size: 13px;
++      letter-spacing: .12em;
++      text-transform: uppercase;
++    }
++    .muted { color: #64748b; font-size: 12px; }
++    .certificate {
++      color: #2563eb;
++      font-family: monospace;
++      font-weight: 700;
++    }
++    .grid {
++      display: grid;
++      grid-template-columns: repeat(2, 1fr);
++      gap: 10px 34px;
++    }
++    .row {
++      display: flex;
++      justify-content: space-between;
++      gap: 16px;
++      padding: 10px 0;
++      border-bottom: 1px solid #e2e8f0;
++      font-size: 13px;
++    }
++    .row strong { text-align: right; }
++    footer {
++      margin-top: 42px;
++      padding-top: 14px;
++      border-top: 1px solid #cbd5e1;
++      color: #64748b;
++      font-size: 11px;
++    }
++    @media print {
++      body { padding: 0; }
++    }
++  `;
++
++  documentRef.head.appendChild(style);
++
++  const body = documentRef.body;
++  const header = documentRef.createElement('header');
++  const titleBlock = documentRef.createElement('div');
++
++  addText(documentRef, titleBlock, 'h1', 'SpeedReport.org');
++  addText(documentRef, titleBlock, 'div', 'Network Verification Report', 'muted');
++  header.appendChild(titleBlock);
++
++  const certificate = documentRef.createElement('div');
++  addText(documentRef, certificate, 'div', report.id, 'certificate');
++  addText(
++    documentRef,
++    certificate,
++    'div',
++    new Date(report.timestamp).toLocaleString(),
++    'muted'
++  );
++  header.appendChild(certificate);
++  body.appendChild(header);
++
++  const sections = [
++    {
++      title: 'Connection details',
++      rows: [
++        ['Provider', report.meta?.isp || 'Unknown'],
++        ['Public IP', report.meta?.ip || 'Unknown'],
++        ['Network', `AS${report.meta?.asn || 0}`],
++        [
++          'Edge node',
++          `${report.meta?.city || 'Unknown'}, ${report.meta?.country || ''} · ${report.meta?.colo || 'Unknown'}`
++        ]
++      ]
++    },
++    {
++      title: 'Measured performance',
++      rows: [
++        ['Download', `${report.metrics.download} Mbps`],
++        ['Upload', `${report.metrics.upload} Mbps`],
++        ['Idle latency', `${report.metrics.ping} ms`],
++        ['Jitter', `${report.metrics.jitter} ms`],
++        ['Loaded latency', `${report.metrics.loadedPing} ms`],
++        ['Loaded jitter', `${report.metrics.loadedJitter} ms`],
++        ['Packet loss', `${report.metrics.loss}%`],
++        ['Loaded packet loss', `${report.metrics.loadedLoss}%`],
++        ['Bufferbloat', report.metrics.bufferbloat],
++        ['Readiness', report.readiness || 'Not recorded']
++      ]
++    }
++  ];
++
++  sections.forEach((section) => {
++    addText(documentRef, body, 'h2', section.title);
++    const grid = documentRef.createElement('div');
++    grid.className = 'grid';
++
++    section.rows.forEach(([label, value]) => {
++      const row = documentRef.createElement('div');
++      row.className = 'row';
++      addText(documentRef, row, 'span', label);
++      addText(documentRef, row, 'strong', value);
++      grid.appendChild(row);
++    });
++
++    body.appendChild(grid);
++  });
++
++  addText(
++    documentRef,
++    body,
++    'footer',
++    'Measurements reflect network conditions at the stated time and edge node. Generated locally in your browser.'
++  );
++
++  printWindow.focus();
++  printWindow.print();
++  printWindow.close();
++}
+\ No newline at end of file
+diff --git a/src/utils/reportShareLinks.js b/src/utils/reportShareLinks.js
+new file mode 100644
+index 0000000..ceb122c
+--- /dev/null
++++ b/src/utils/reportShareLinks.js
+@@ -0,0 +1,77 @@
++const REPORT_PREFIX = 'report=';
++const MAX_REPORT_LENGTH = 12000;
++
++function bytesToBase64(bytes) {
++  let binary = '';
++
++  bytes.forEach((byte) => {
++    binary += String.fromCharCode(byte);
++  });
++
++  return btoa(binary)
++    .replace(/\+/g, '-')
++    .replace(/\//g, '_')
++    .replace(/=+$/g, '');
++}
++
++function base64ToBytes(value) {
++  const normalized = value
++    .replace(/-/g, '+')
++    .replace(/_/g, '/')
++    .padEnd(Math.ceil(value.length / 4) * 4, '=');
++
++  const binary = atob(normalized);
++  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
++}
++
++function isValidReport(report) {
++  return Boolean(
++    report &&
++    typeof report === 'object' &&
++    typeof report.id === 'string' &&
++    typeof report.timestamp === 'string' &&
++    report.metrics &&
++    typeof report.metrics.download === 'number' &&
++    typeof report.metrics.upload === 'number' &&
++    typeof report.metrics.ping === 'number'
++  );
++}
++
++export function createReportShareUrl(report) {
++  const json = JSON.stringify(report);
++  const encoded = bytesToBase64(new TextEncoder().encode(json));
++  const url = new URL(window.location.href);
++
++  url.hash = `${REPORT_PREFIX}${encoded}`;
++  return url.toString();
++}
++
++export function readReportFromUrl() {
++  const hash = window.location.hash;
++
++  if (!hash.startsWith(`#${REPORT_PREFIX}`)) {
++    return null;
++  }
++
++  const encoded = hash.slice(REPORT_PREFIX.length + 1);
++
++  if (!encoded || encoded.length > MAX_REPORT_LENGTH) {
++    return null;
++  }
++
++  try {
++    const report = JSON.parse(
++      new TextDecoder().decode(base64ToBytes(encoded))
++    );
++
++    return isValidReport(report) ? report : null;
++  } catch {
++    return null;
++  }
++}
++
++export function clearReportFromUrl() {
++  const url = new URL(window.location.href);
++  url.hash = '';
++  window.history.replaceState({}, '', url);
++}
+\ No newline at end of file
+diff --git a/tailwind.config.js b/tailwind.config.js
+new file mode 100644
+index 0000000..f144457
+--- /dev/null
++++ b/tailwind.config.js
+@@ -0,0 +1,8 @@
++/** @type {import('tailwindcss').Config} */
++export default {
++  content: [
++    "./index.html",
++    "./src/**/*.{js,ts,jsx,tsx}",
++  ],
++  plugins: [],
++}
+\ No newline at end of file
+diff --git a/vite.config.js b/vite.config.js
+new file mode 100644
+index 0000000..d9fed19
+--- /dev/null
++++ b/vite.config.js
+@@ -0,0 +1,19 @@
++import { defineConfig } from 'vite';
++import react from '@vitejs/plugin-react';
++import path from 'path';
++
++export default defineConfig({
++  plugins: [react()],
++  resolve: {
++    alias: {
++      '@': path.resolve(__dirname, './src')
++    }
++  },
++  server: {
++    historyApiFallback: true,
++  },
++   build: {
++    outDir: 'dist',
++    sourcemap: true
++  },
++});
+\ No newline at end of file
+--
+2.53.0
