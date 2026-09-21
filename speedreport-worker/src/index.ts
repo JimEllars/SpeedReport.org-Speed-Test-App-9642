@@ -1,3 +1,7 @@
+
+interface Env {
+  ASSETS: { fetch: typeof fetch };
+}
 import { handleDownload } from './download';
 import { cors, json, telemetryHeaders } from './http';
 import { handleMeta } from './meta';
