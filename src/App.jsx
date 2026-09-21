@@ -20,12 +20,27 @@ function App() {
     history,
     latestReport,
     save,
-    clear
+    clear,
+    togglePin
   } = useLocalVault();
   const [report, setReport] = useState(null);
   const [isShared, setIsShared] = useState(false);
 
+useEffect(() => {
+    const handleHashChange = () => {
+      const sharedReport = readReportFromUrl();
+      if (sharedReport) {
+        setReport(sharedReport);
+        setIsShared(true);
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   useEffect(() => {
+
     const sharedReport = readReportFromUrl();
 
     if (sharedReport) {
@@ -137,6 +152,7 @@ function App() {
             history={history}
             onClear={handleClearHistory}
             onSelect={handleSelectReport}
+            onTogglePin={togglePin}
           />
         </div>
       </main>

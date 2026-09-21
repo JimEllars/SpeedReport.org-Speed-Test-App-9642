@@ -34,9 +34,9 @@ export function useSpeedTest(onComplete) {
   const [samples, setSamples] = useState([]);
   const [error, setError] = useState('');
 
-  const updateLive = useCallback((key, value) => {
+  const updateLive = useCallback((key, value, ping) => {
     setMetrics((current) => ({ ...current, [key]: value }));
-    setSamples((current) => [...current.slice(-24), value]);
+    setSamples((current) => [...current.slice(-24), { value, ping }]);
   }, []);
 
   const cancel = useCallback(() => {
@@ -82,7 +82,7 @@ export function useSpeedTest(onComplete) {
 
       setState(STATES.DOWNLOAD);
       const dlRes = await measureDownload(
-        (value) => updateLive('download', value),
+        (value, ping) => updateLive('download', value, ping),
         controller.signal
       );
       setMetrics((current) => ({ ...current, download: dlRes.bandwidth }));
@@ -90,7 +90,7 @@ export function useSpeedTest(onComplete) {
       setState(STATES.UPLOAD);
       setSamples([]); // Reset samples for upload
       const ulRes = await measureUpload(
-        (value) => updateLive('upload', value),
+        (value, ping) => updateLive('upload', value, ping),
         controller.signal
       );
       setMetrics((current) => ({ ...current, upload: ulRes.bandwidth }));

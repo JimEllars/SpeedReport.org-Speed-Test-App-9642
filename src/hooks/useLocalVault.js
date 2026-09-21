@@ -37,10 +37,27 @@ export function useLocalVault() {
     setStorageUsagePercent(Math.round((loaded.length / MAX_HISTORY) * 100));
   }, []);
 
+
   const save = useCallback((report) => {
     setHistory((current) => {
       const withoutDuplicate = current.filter((item) => item.id !== report.id);
-      const next = [report, ...withoutDuplicate].slice(0, MAX_HISTORY);
+
+      const pinned = withoutDuplicate.filter(item => item.pinned);
+      const unpinned = withoutDuplicate.filter(item => !item.pinned);
+
+      let nextUnpinned = unpinned;
+      if (pinned.length + unpinned.length + 1 > MAX_HISTORY) {
+        nextUnpinned = unpinned.slice(0, Math.max(0, MAX_HISTORY - pinned.length - 1));
+      }
+
+      let next = [report, ...pinned, ...nextUnpinned].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      if (next.length > MAX_HISTORY) {
+         const nextPinned = next.filter(i => i.pinned);
+         const nextNonPinned = next.filter(i => !i.pinned);
+         const maxUnpinned = Math.max(0, MAX_HISTORY - nextPinned.length);
+         next = [...nextPinned, ...nextNonPinned.slice(0, maxUnpinned)].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      }
 
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -48,22 +65,45 @@ export function useLocalVault() {
         return next;
       } catch (error) {
         if (error.name === 'QuotaExceededError' || error.code === 22) {
-          const pruned = next.slice(0, next.length - 1);
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
-            setStorageUsagePercent(Math.round((pruned.length / MAX_HISTORY) * 100));
-            return pruned;
-          } catch (e) {
-            // Give up gracefully
-            return current;
+          const nextPinned = next.filter(i => i.pinned);
+          const nextNonPinned = next.filter(i => !i.pinned);
+          if (nextNonPinned.length > 0) {
+            const prunedNonPinned = nextNonPinned.slice(0, nextNonPinned.length - 1);
+            const pruned = [...nextPinned, ...prunedNonPinned].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            try {
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
+              setStorageUsagePercent(Math.round((pruned.length / MAX_HISTORY) * 100));
+              return pruned;
+            } catch (e) {
+              return current;
+            }
           }
+          return current;
         }
         return current;
       }
     });
   }, []);
 
+  const togglePin = useCallback((reportId) => {
+    setHistory((current) => {
+      const next = current.map((item) => {
+        if (item.id === reportId) {
+          return { ...item, pinned: !item.pinned };
+        }
+        return item;
+      });
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        return next;
+      } catch (error) {
+        return current;
+      }
+    });
+  }, []);
+
   const clear = useCallback(() => {
+
     localStorage.removeItem(STORAGE_KEY);
     setHistory([]);
     setStorageUsagePercent(0);
@@ -74,6 +114,7 @@ export function useLocalVault() {
     latestReport: history[0] || null,
     save,
     clear,
+    togglePin,
     storageUsagePercent
   };
 }
