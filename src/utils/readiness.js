@@ -1,5 +1,5 @@
 export function getReadiness(metrics) {
-  const calls = Math.max(1, Math.floor(Math.min(metrics.upload / 0.12, 250)));
+  const calls = Math.max(1, Math.floor(metrics.upload / 0.12));
   const employees = Math.max(1, Math.floor(Math.min(metrics.download / 8, metrics.upload / 3)));
 
   // VoIP requires latency < 150ms. Since loaded latency affects VoIP during active use, factor it in.
