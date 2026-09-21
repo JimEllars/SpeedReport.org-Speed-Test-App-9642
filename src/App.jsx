@@ -80,7 +80,7 @@ function App() {
   const previousReport = history.find((item) => item.id !== report?.id);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell w-full max-w-full overflow-x-hidden">
       <Header />
 
       <main>

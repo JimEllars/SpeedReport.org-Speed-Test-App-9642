@@ -93,7 +93,7 @@ export default function SpeedGauge({
         {PHASE_LABELS[state]}
       </div>
 
-      <div className="gauge" aria-live="polite" aria-valuenow={value}>
+      <div className="gauge w-full max-w-[280px] sm:max-w-[340px] md:max-w-[420px] mx-auto" aria-live="polite" aria-valuenow={value}>
         <svg viewBox="0 0 240 145" aria-label={`${value} megabits per second`}>
           <path className="gauge-track" d="M25 120 A95 95 0 0 1 215 120" />
           <motion.path

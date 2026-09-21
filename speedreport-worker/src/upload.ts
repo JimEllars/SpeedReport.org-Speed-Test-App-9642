@@ -46,5 +46,10 @@ export async function handleUpload(request: Request): Promise<Response> {
   response.headers.set('X-Received-Bytes', String(receivedBytes));
   response.headers.set('X-Duration-Ms', String(durationMs));
 
+  // Use existing server timing header if present from json helper, or add upload duration
+  const existingTiming = response.headers.get('Server-Timing') || '';
+  const prefix = existingTiming ? `${existingTiming}, ` : '';
+  response.headers.set('Server-Timing', `${prefix}upload;dur=${durationMs}`);
+
   return response;
 }

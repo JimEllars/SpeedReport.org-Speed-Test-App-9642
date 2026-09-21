@@ -188,8 +188,7 @@ main {
 
 .gauge {
   position: relative;
-  max-width: 350px;
-  margin: 16px auto -5px;
+    margin: 16px auto -5px;
 }
 
 .gauge svg {
@@ -856,5 +855,13 @@ footer strong {
     justify-content: center;
     padding: 25px 0;
     text-align: center;
+  }
+}
+@media (max-width: 639px) {
+  .metrics-grid,
+  .diagnostic-grid {
+    grid-template-columns: 1fr;
+    grid-auto-flow: row;
+    overflow-x: hidden;
   }
 }

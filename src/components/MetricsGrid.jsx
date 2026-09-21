@@ -28,7 +28,7 @@ export default function MetricsGrid({ metrics }) {
   return (
     <section className="metrics-grid">
       {items.map(([label, value, unit, icon]) => (
-        <div className="metric-card" key={label}>
+        <div className="metric-card p-4 sm:p-6" key={label}>
           <div className="metric-top">
             <SafeIcon icon={icon} />
             <span>{label}</span>
