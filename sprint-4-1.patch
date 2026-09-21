@@ -1,0 +1,413 @@
+From 25abbd2d04e6cc4e39621f8bab917fae32fb11db Mon Sep 17 00:00:00 2001
+From: "google-labs-jules[bot]"
+ <161369871+google-labs-jules[bot]@users.noreply.github.com>
+Date: Mon, 21 Sep 2026 02:19:17 +0000
+Subject: [PATCH] fix: High-throughput engine optimization & mobile portrait
+ view hardening
+
+---
+ speedreport-worker/src/download.ts   |   6 +-
+ speedreport-worker/src/http.ts       |   4 +-
+ speedreport-worker/src/upload.ts     |   5 ++
+ src/App.css                          |  13 +++-
+ src/App.jsx                          |   2 +-
+ src/components/BusinessAuditCard.jsx |   2 +-
+ src/components/ISPDetailsCard.jsx    |   2 +-
+ src/components/MetricsGrid.jsx       |   2 +-
+ src/components/SpeedGauge.jsx        |   2 +-
+ src/index.css                        |   5 ++
+ src/utils/benchmarkEngine.js         | 110 ++++++++++++++++++++-------
+ 11 files changed, 116 insertions(+), 37 deletions(-)
+
+diff --git a/speedreport-worker/src/download.ts b/speedreport-worker/src/download.ts
+index d884186..3690e60 100644
+--- a/speedreport-worker/src/download.ts
++++ b/speedreport-worker/src/download.ts
+@@ -4,6 +4,9 @@ const CHUNK_SIZE = 64 * 1024;
+ const DEFAULT_BYTES = 25 * 1024 * 1024;
+ const MAX_BYTES = 100 * 1024 * 1024;
+
++const STATIC_CHUNK = new Uint8Array(CHUNK_SIZE);
++crypto.getRandomValues(STATIC_CHUNK);
++
+ export function handleDownload(request: Request, url: URL): Response {
+   const requested = Number(url.searchParams.get('bytes')) || DEFAULT_BYTES;
+   const target = Math.min(Math.max(requested, CHUNK_SIZE), MAX_BYTES);
+@@ -21,8 +24,7 @@ export function handleDownload(request: Request, url: URL): Response {
+       }
+       const remaining = target - sent;
+       const size = Math.min(remaining, CHUNK_SIZE);
+-      const chunk = new Uint8Array(size);
+-      crypto.getRandomValues(chunk);
++      const chunk = size === CHUNK_SIZE ? STATIC_CHUNK : STATIC_CHUNK.subarray(0, size);
+       controller.enqueue(chunk);
+       sent += size;
+     }
+diff --git a/speedreport-worker/src/http.ts b/speedreport-worker/src/http.ts
+index 25e9809..916b5e0 100644
+--- a/speedreport-worker/src/http.ts
++++ b/speedreport-worker/src/http.ts
+@@ -5,7 +5,9 @@ export const cors = {
+   'Access-Control-Expose-Headers': 'Server-Timing, cf-ray, cf-colo, cf-proto, X-Received-Bytes, X-Duration-Ms',
+   'Access-Control-Max-Age': '86400',
+   'Timing-Allow-Origin': '*',
+-  'Cache-Control': 'no-store'
++  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
++  'Content-Encoding': 'identity',
++  'X-Accel-Buffering': 'no'
+ };
+
+ interface RequestCfProperties {
+diff --git a/speedreport-worker/src/upload.ts b/speedreport-worker/src/upload.ts
+index 1092848..7fab0ae 100644
+--- a/speedreport-worker/src/upload.ts
++++ b/speedreport-worker/src/upload.ts
+@@ -45,6 +45,11 @@ export async function handleUpload(request: Request): Promise<Response> {
+
+   response.headers.set('X-Received-Bytes', String(receivedBytes));
+   response.headers.set('X-Duration-Ms', String(durationMs));
++
++  // Use existing server timing header if present from json helper, or add upload duration
++  const existingTiming = response.headers.get('Server-Timing') || '';
++  const prefix = existingTiming ? `${existingTiming}, ` : '';
++  response.headers.set('Server-Timing', `${prefix}upload;dur=${durationMs}`);
+
+   return response;
+ }
+diff --git a/src/App.css b/src/App.css
+index 1c63ec5..4ea914e 100644
+--- a/src/App.css
++++ b/src/App.css
+@@ -188,8 +188,7 @@ main {
+
+ .gauge {
+   position: relative;
+-  max-width: 350px;
+-  margin: 16px auto -5px;
++    margin: 16px auto -5px;
+ }
+
+ .gauge svg {
+@@ -857,4 +856,12 @@ footer strong {
+     padding: 25px 0;
+     text-align: center;
+   }
+-}
+\ No newline at end of file
++}
++@media (max-width: 639px) {
++  .metrics-grid,
++  .diagnostic-grid {
++    grid-template-columns: 1fr;
++    grid-auto-flow: row;
++    overflow-x: hidden;
++  }
++}
+diff --git a/src/App.jsx b/src/App.jsx
+index 343ab4b..58480e9 100644
+--- a/src/App.jsx
++++ b/src/App.jsx
+@@ -80,7 +80,7 @@ function App() {
+   const previousReport = history.find((item) => item.id !== report?.id);
+
+   return (
+-    <div className="app-shell">
++    <div className="app-shell w-full max-w-full overflow-x-hidden">
+       <Header />
+
+       <main>
+diff --git a/src/components/BusinessAuditCard.jsx b/src/components/BusinessAuditCard.jsx
+index 6989a61..7a1f912 100644
+--- a/src/components/BusinessAuditCard.jsx
++++ b/src/components/BusinessAuditCard.jsx
+@@ -14,7 +14,7 @@ export default function BusinessAuditCard({ metrics, complete }) {
+   ];
+
+   return (
+-    <section className="panel audit-panel">
++    <section className="panel audit-panel p-4 sm:p-6">
+       <div className="panel-heading">
+         <div><span className="eyebrow">Operational assessment</span><h2>Business readiness</h2></div>
+         <div className={`grade ${complete ? 'ready' : ''}`}>{complete ? audit.grade : 'Pending'}</div>
+diff --git a/src/components/ISPDetailsCard.jsx b/src/components/ISPDetailsCard.jsx
+index 2be81fc..416395f 100644
+--- a/src/components/ISPDetailsCard.jsx
++++ b/src/components/ISPDetailsCard.jsx
+@@ -13,7 +13,7 @@ export default function ISPDetailsCard({ meta }) {
+   const [visible, setVisible] = useState(false);
+
+   return (
+-    <section className="panel">
++    <section className="panel p-4 sm:p-6">
+       <div className="panel-heading">
+         <div>
+           <span className="eyebrow">Network path</span>
+diff --git a/src/components/MetricsGrid.jsx b/src/components/MetricsGrid.jsx
+index 9afacea..4d85cf1 100644
+--- a/src/components/MetricsGrid.jsx
++++ b/src/components/MetricsGrid.jsx
+@@ -28,7 +28,7 @@ export default function MetricsGrid({ metrics }) {
+   return (
+     <section className="metrics-grid">
+       {items.map(([label, value, unit, icon]) => (
+-        <div className="metric-card" key={label}>
++        <div className="metric-card p-4 sm:p-6" key={label}>
+           <div className="metric-top">
+             <SafeIcon icon={icon} />
+             <span>{label}</span>
+diff --git a/src/components/SpeedGauge.jsx b/src/components/SpeedGauge.jsx
+index 31103b4..6445b10 100644
+--- a/src/components/SpeedGauge.jsx
++++ b/src/components/SpeedGauge.jsx
+@@ -93,7 +93,7 @@ export default function SpeedGauge({
+         {PHASE_LABELS[state]}
+       </div>
+
+-      <div className="gauge" aria-live="polite" aria-valuenow={value}>
++      <div className="gauge w-full max-w-[280px] sm:max-w-[340px] md:max-w-[420px] mx-auto" aria-live="polite" aria-valuenow={value}>
+         <svg viewBox="0 0 240 145" aria-label={`${value} megabits per second`}>
+           <path className="gauge-track" d="M25 120 A95 95 0 0 1 215 120" />
+           <motion.path
+diff --git a/src/index.css b/src/index.css
+index 5e78063..e62851b 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -25,4 +25,9 @@ button, a {
+ #root {
+   width: 100%;
+   min-height: 100vh;
++}
++#root {
++  width: 100%;
++  max-width: 100%;
++  overflow-x: hidden;
+ }
+\ No newline at end of file
+diff --git a/src/utils/benchmarkEngine.js b/src/utils/benchmarkEngine.js
+index b14599e..47da649 100644
+--- a/src/utils/benchmarkEngine.js
++++ b/src/utils/benchmarkEngine.js
+@@ -108,9 +108,11 @@ class ThroughputCalculator {
+   constructor() {
+     this.chunks = []; // { bytes: number, time: number }
+     this.totalBytesInWindow = 0;
+-    this.allBytes = 0; // Total bytes including those dropped from the window, after warmup
++    this.allBytes = 0;
++    this.speedHistory = []; // Array of Mbps slices after warmup
+     this.started = performance.now();
+-    this.warmupTime = 500; // 500ms warmup
++    this.warmupTime = 2000; // 2.0s warmup
++    this.windowSize = 200; // 200ms window
+   }
+
+   addBytes(bytes) {
+@@ -122,8 +124,8 @@ class ThroughputCalculator {
+       this.allBytes += bytes;
+     }
+
+-    // slide window: remove chunks older than 500ms
+-    while (this.chunks.length > 0 && now - this.chunks[0].time > 500) {
++    // slide window: remove chunks older than windowSize
++    while (this.chunks.length > 0 && now - this.chunks[0].time > this.windowSize) {
+       this.totalBytesInWindow -= this.chunks[0].bytes;
+       this.chunks.shift();
+     }
+@@ -138,14 +140,29 @@ class ThroughputCalculator {
+
+     if (windowDuration < 10) windowDuration = 10; // Prevent div by 0
+
+-    return (this.totalBytesInWindow * 8) / (windowDuration / 1000) / 1e6;
++    const mbps = (this.totalBytesInWindow * 8) / (windowDuration / 1000) / 1e6;
++
++    // Record steady-state slices for 90th percentile calculation
++    if (now - this.started >= this.warmupTime) {
++      // Avoid flooding with identical times, rough slice bucketing
++      if (!this.lastSliceTime || now - this.lastSliceTime >= 100) {
++        this.speedHistory.push(mbps);
++        this.lastSliceTime = now;
++      }
++    }
++
++    return mbps;
+   }
+
+   getFinalSpeedMbps() {
+-    const now = performance.now();
+-    const duration = now - this.started - this.warmupTime;
+-    if (duration <= 0) return this.getLiveSpeedMbps(); // fallback
+-    return (this.allBytes * 8) / (duration / 1000) / 1e6;
++    if (this.speedHistory.length === 0) return this.getLiveSpeedMbps();
++
++    // Sort ascending
++    const sorted = [...this.speedHistory].sort((a, b) => a - b);
++
++    // 90th percentile
++    const idx = Math.floor(sorted.length * 0.90);
++    return sorted[idx] || this.getLiveSpeedMbps();
+   }
+ }
+
+@@ -175,6 +192,15 @@ async function consumeDownload(bytes, calculator, signal) {
+ }
+
+ export async function measureDownload(onProgress = () => {}, signal) {
++  let phaseFinished = false;
++  const phaseController = new AbortController();
++  const phaseSignal = phaseController.signal;
++  // If user aborts, also abort our phase controller
++  if (signal) {
++    signal.addEventListener('abort', () => phaseController.abort());
++    if (signal.aborted) phaseController.abort();
++  }
++
+   const PHASE_TIMEOUT_MS = 15000;
+   const started = performance.now();
+   let timeoutId;
+@@ -186,7 +212,7 @@ export async function measureDownload(onProgress = () => {}, signal) {
+
+   let pings = [];
+   let pingIntervalId = setInterval(async () => {
+-    if (signal?.aborted) return;
++    if (phaseSignal?.aborted) return;
+     const latency = await probeLoadedPing(signal);
+     if (latency !== null) pings.push(latency);
+   }, 1000);
+@@ -197,18 +223,32 @@ export async function measureDownload(onProgress = () => {}, signal) {
+   }, 50);
+
+   let streams = [];
+-  const startStream = () => consumeDownload(25 * 1024 * 1024, calculator, signal);
++
++  // Start with 2MB, ramp up to 25MB based on velocity
++  const startStream = () => {
++    const currentMbps = calculator.getLiveSpeedMbps();
++    let chunkSize = 2 * 1024 * 1024; // 2MB default
++    if (currentMbps > 50) chunkSize = 5 * 1024 * 1024;
++    if (currentMbps > 100) chunkSize = 10 * 1024 * 1024;
++    if (currentMbps > 200) chunkSize = 25 * 1024 * 1024;
++
++    // In our loop, when a stream finishes we can start another one if not aborted
++    return consumeDownload(chunkSize, calculator, phaseSignal).then(() => {
++      if (!signal?.aborted && !phaseFinished) {
++         return startStream(); // Keep downloading if we haven't timed out
++      }
++    });
++  };
+
+-  // Default 4 streams
++  // Run 4 to 6 concurrent streams
+   for (let i = 0; i < 4; i++) {
+-    streams.push(startStream().catch(e => { if (e.name !== 'AbortError') console.error(e); }));
++    streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
+   }
+
+   // Dynamic scaling checker
+   let scalingInterval = setInterval(() => {
+-    if (calculator.getLiveSpeedMbps() > 250 && streams.length < 8) {
+-      streams.push(startStream().catch(e => { if (e.name !== 'AbortError') console.error(e); }));
+-      streams.push(startStream().catch(e => { if (e.name !== 'AbortError') console.error(e); }));
++    if (calculator.getLiveSpeedMbps() > 150 && streams.length < 6) {
++      streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
+     }
+   }, 1000);
+
+@@ -219,7 +259,10 @@ export async function measureDownload(onProgress = () => {}, signal) {
+     ]);
+   } catch (error) {
+     if (error.name === 'AbortError') throw error;
++    // Ignore Phase timeout error to gracefully finish the test phase
+   } finally {
++    phaseFinished = true;
++    phaseController.abort();
+     clearTimeout(timeoutId);
+     clearInterval(pingIntervalId);
+     clearInterval(progressIntervalId);
+@@ -255,12 +298,12 @@ function createUploadPayload(size) {
+
+ // We need a custom upload client to track live progress since fetch API does not support upload progress tracking
+ // XMLHttpRequest supports it. Let's use XHR wrapped in a Promise.
+-function uploadPayloadWithProgress(payload, calculator, signal) {
++function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
+   return new Promise((resolve, reject) => {
+     const xhr = new XMLHttpRequest();
+
+-    if (signal) {
+-      signal.addEventListener('abort', () => {
++    if (phaseSignal) {
++      phaseSignal.addEventListener('abort', () => {
+         xhr.abort();
+         reject(new DOMException('The diagnostic was cancelled.', 'AbortError'));
+       });
+@@ -269,7 +312,7 @@ function uploadPayloadWithProgress(payload, calculator, signal) {
+     let lastLoaded = 0;
+
+     xhr.upload.addEventListener('progress', (event) => {
+-      if (signal?.aborted) return;
++      if (phaseSignal?.aborted) return;
+       const loadedBytes = event.loaded - lastLoaded;
+       calculator.addBytes(loadedBytes);
+       lastLoaded = event.loaded;
+@@ -287,6 +330,15 @@ function uploadPayloadWithProgress(payload, calculator, signal) {
+ }
+
+ export async function measureUpload(onProgress = () => {}, signal) {
++  let phaseFinished = false;
++  const phaseController = new AbortController();
++  const phaseSignal = phaseController.signal;
++  // If user aborts, also abort our phase controller
++  if (signal) {
++    signal.addEventListener('abort', () => phaseController.abort());
++    if (signal.aborted) phaseController.abort();
++  }
++
+   const PHASE_TIMEOUT_MS = 15000;
+   const started = performance.now();
+   let timeoutId;
+@@ -298,7 +350,7 @@ export async function measureUpload(onProgress = () => {}, signal) {
+
+   let pings = [];
+   let pingIntervalId = setInterval(async () => {
+-    if (signal?.aborted) return;
++    if (phaseSignal?.aborted) return;
+     const latency = await probeLoadedPing(signal);
+     if (latency !== null) pings.push(latency);
+   }, 1000);
+@@ -311,17 +363,20 @@ export async function measureUpload(onProgress = () => {}, signal) {
+   const payload = createUploadPayload(8 * 1024 * 1024);
+
+   let streams = [];
+-  const startStream = () => uploadPayloadWithProgress(payload, calculator, signal);
++  const startStream = () => uploadPayloadWithProgress(payload, calculator, phaseSignal).then(() => {
++    if (!signal?.aborted && !phaseFinished) {
++      return startStream(); // Keep uploading if we haven't timed out
++    }
++  });
+
+   // Default 4 streams
+   for (let i = 0; i < 4; i++) {
+-    streams.push(startStream().catch(e => { if (e.name !== 'AbortError') console.error(e); }));
++    streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
+   }
+
+   let scalingInterval = setInterval(() => {
+-    if (calculator.getLiveSpeedMbps() > 250 && streams.length < 8) {
+-      streams.push(startStream().catch(e => { if (e.name !== 'AbortError') console.error(e); }));
+-      streams.push(startStream().catch(e => { if (e.name !== 'AbortError') console.error(e); }));
++    if (calculator.getLiveSpeedMbps() > 150 && streams.length < 6) {
++      streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
+     }
+   }, 1000);
+
+@@ -332,7 +387,10 @@ export async function measureUpload(onProgress = () => {}, signal) {
+     ]);
+   } catch (error) {
+     if (error.name === 'AbortError') throw error;
++    // Ignore Phase timeout error to gracefully finish the test phase
+   } finally {
++    phaseFinished = true;
++    phaseController.abort();
+     clearTimeout(timeoutId);
+     clearInterval(pingIntervalId);
+     clearInterval(progressIntervalId);
+--
+2.53.0

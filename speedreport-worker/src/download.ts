@@ -4,6 +4,9 @@ const CHUNK_SIZE = 64 * 1024;
 const DEFAULT_BYTES = 25 * 1024 * 1024;
 const MAX_BYTES = 100 * 1024 * 1024;
 
+const STATIC_CHUNK = new Uint8Array(CHUNK_SIZE);
+crypto.getRandomValues(STATIC_CHUNK);
+
 export function handleDownload(request: Request, url: URL): Response {
   const requested = Number(url.searchParams.get('bytes')) || DEFAULT_BYTES;
   const target = Math.min(Math.max(requested, CHUNK_SIZE), MAX_BYTES);
@@ -21,8 +24,7 @@ export function handleDownload(request: Request, url: URL): Response {
       }
       const remaining = target - sent;
       const size = Math.min(remaining, CHUNK_SIZE);
-      const chunk = new Uint8Array(size);
-      crypto.getRandomValues(chunk);
+      const chunk = size === CHUNK_SIZE ? STATIC_CHUNK : STATIC_CHUNK.subarray(0, size);
       controller.enqueue(chunk);
       sent += size;
     }

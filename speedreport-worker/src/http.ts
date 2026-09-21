@@ -5,7 +5,9 @@ export const cors = {
   'Access-Control-Expose-Headers': 'Server-Timing, cf-ray, cf-colo, cf-proto, X-Received-Bytes, X-Duration-Ms',
   'Access-Control-Max-Age': '86400',
   'Timing-Allow-Origin': '*',
-  'Cache-Control': 'no-store'
+  'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+  'Content-Encoding': 'identity',
+  'X-Accel-Buffering': 'no'
 };
 
 interface RequestCfProperties {

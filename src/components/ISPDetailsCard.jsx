@@ -13,7 +13,7 @@ export default function ISPDetailsCard({ meta }) {
   const [visible, setVisible] = useState(false);
 
   return (
-    <section className="panel">
+    <section className="panel p-4 sm:p-6">
       <div className="panel-heading">
         <div>
           <span className="eyebrow">Network path</span>

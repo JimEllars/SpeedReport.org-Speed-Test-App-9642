@@ -108,9 +108,11 @@ class ThroughputCalculator {
   constructor() {
     this.chunks = []; // { bytes: number, time: number }
     this.totalBytesInWindow = 0;
-    this.allBytes = 0; // Total bytes including those dropped from the window, after warmup
+    this.allBytes = 0;
+    this.speedHistory = []; // Array of Mbps slices after warmup
     this.started = performance.now();
-    this.warmupTime = 500; // 500ms warmup
+    this.warmupTime = 2000; // 2.0s warmup
+    this.windowSize = 200; // 200ms window
   }
 
   addBytes(bytes) {
@@ -122,8 +124,8 @@ class ThroughputCalculator {
       this.allBytes += bytes;
     }
 
-    // slide window: remove chunks older than 500ms
-    while (this.chunks.length > 0 && now - this.chunks[0].time > 500) {
+    // slide window: remove chunks older than windowSize
+    while (this.chunks.length > 0 && now - this.chunks[0].time > this.windowSize) {
       this.totalBytesInWindow -= this.chunks[0].bytes;
       this.chunks.shift();
     }
@@ -138,14 +140,29 @@ class ThroughputCalculator {
 
     if (windowDuration < 10) windowDuration = 10; // Prevent div by 0
 
-    return (this.totalBytesInWindow * 8) / (windowDuration / 1000) / 1e6;
+    const mbps = (this.totalBytesInWindow * 8) / (windowDuration / 1000) / 1e6;
+
+    // Record steady-state slices for 90th percentile calculation
+    if (now - this.started >= this.warmupTime) {
+      // Avoid flooding with identical times, rough slice bucketing
+      if (!this.lastSliceTime || now - this.lastSliceTime >= 100) {
+        this.speedHistory.push(mbps);
+        this.lastSliceTime = now;
+      }
+    }
+
+    return mbps;
   }
 
   getFinalSpeedMbps() {
-    const now = performance.now();
-    const duration = now - this.started - this.warmupTime;
-    if (duration <= 0) return this.getLiveSpeedMbps(); // fallback
-    return (this.allBytes * 8) / (duration / 1000) / 1e6;
+    if (this.speedHistory.length === 0) return this.getLiveSpeedMbps();
+
+    // Sort ascending
+    const sorted = [...this.speedHistory].sort((a, b) => a - b);
+
+    // 90th percentile
+    const idx = Math.floor(sorted.length * 0.90);
+    return sorted[idx] || this.getLiveSpeedMbps();
   }
 }
 
@@ -175,6 +192,15 @@ async function consumeDownload(bytes, calculator, signal) {
 }
 
 export async function measureDownload(onProgress = () => {}, signal) {
+  let phaseFinished = false;
+  const phaseController = new AbortController();
+  const phaseSignal = phaseController.signal;
+  // If user aborts, also abort our phase controller
+  if (signal) {
+    signal.addEventListener('abort', () => phaseController.abort());
+    if (signal.aborted) phaseController.abort();
+  }
+
   const PHASE_TIMEOUT_MS = 15000;
   const started = performance.now();
   let timeoutId;
@@ -186,7 +212,7 @@ export async function measureDownload(onProgress = () => {}, signal) {
 
   let pings = [];
   let pingIntervalId = setInterval(async () => {
-    if (signal?.aborted) return;
+    if (phaseSignal?.aborted) return;
     const latency = await probeLoadedPing(signal);
     if (latency !== null) pings.push(latency);
   }, 1000);
@@ -197,18 +223,32 @@ export async function measureDownload(onProgress = () => {}, signal) {
   }, 50);
 
   let streams = [];
-  const startStream = () => consumeDownload(25 * 1024 * 1024, calculator, signal);
 
-  // Default 4 streams
+  // Start with 2MB, ramp up to 25MB based on velocity
+  const startStream = () => {
+    const currentMbps = calculator.getLiveSpeedMbps();
+    let chunkSize = 2 * 1024 * 1024; // 2MB default
+    if (currentMbps > 50) chunkSize = 5 * 1024 * 1024;
+    if (currentMbps > 100) chunkSize = 10 * 1024 * 1024;
+    if (currentMbps > 200) chunkSize = 25 * 1024 * 1024;
+
+    // In our loop, when a stream finishes we can start another one if not aborted
+    return consumeDownload(chunkSize, calculator, phaseSignal).then(() => {
+      if (!signal?.aborted && !phaseFinished) {
+         return startStream(); // Keep downloading if we haven't timed out
+      }
+    });
+  };
+
+  // Run 4 to 6 concurrent streams
   for (let i = 0; i < 4; i++) {
-    streams.push(startStream().catch(e => { if (e.name !== 'AbortError') console.error(e); }));
+    streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
   }
 
   // Dynamic scaling checker
   let scalingInterval = setInterval(() => {
-    if (calculator.getLiveSpeedMbps() > 250 && streams.length < 8) {
-      streams.push(startStream().catch(e => { if (e.name !== 'AbortError') console.error(e); }));
-      streams.push(startStream().catch(e => { if (e.name !== 'AbortError') console.error(e); }));
+    if (calculator.getLiveSpeedMbps() > 150 && streams.length < 6) {
+      streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
     }
   }, 1000);
 
@@ -219,7 +259,10 @@ export async function measureDownload(onProgress = () => {}, signal) {
     ]);
   } catch (error) {
     if (error.name === 'AbortError') throw error;
+    // Ignore Phase timeout error to gracefully finish the test phase
   } finally {
+    phaseFinished = true;
+    phaseController.abort();
     clearTimeout(timeoutId);
     clearInterval(pingIntervalId);
     clearInterval(progressIntervalId);
@@ -255,12 +298,12 @@ function createUploadPayload(size) {
 
 // We need a custom upload client to track live progress since fetch API does not support upload progress tracking
 // XMLHttpRequest supports it. Let's use XHR wrapped in a Promise.
-function uploadPayloadWithProgress(payload, calculator, signal) {
+function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
-    if (signal) {
-      signal.addEventListener('abort', () => {
+    if (phaseSignal) {
+      phaseSignal.addEventListener('abort', () => {
         xhr.abort();
         reject(new DOMException('The diagnostic was cancelled.', 'AbortError'));
       });
@@ -269,7 +312,7 @@ function uploadPayloadWithProgress(payload, calculator, signal) {
     let lastLoaded = 0;
 
     xhr.upload.addEventListener('progress', (event) => {
-      if (signal?.aborted) return;
+      if (phaseSignal?.aborted) return;
       const loadedBytes = event.loaded - lastLoaded;
       calculator.addBytes(loadedBytes);
       lastLoaded = event.loaded;
@@ -287,6 +330,15 @@ function uploadPayloadWithProgress(payload, calculator, signal) {
 }
 
 export async function measureUpload(onProgress = () => {}, signal) {
+  let phaseFinished = false;
+  const phaseController = new AbortController();
+  const phaseSignal = phaseController.signal;
+  // If user aborts, also abort our phase controller
+  if (signal) {
+    signal.addEventListener('abort', () => phaseController.abort());
+    if (signal.aborted) phaseController.abort();
+  }
+
   const PHASE_TIMEOUT_MS = 15000;
   const started = performance.now();
   let timeoutId;
@@ -298,7 +350,7 @@ export async function measureUpload(onProgress = () => {}, signal) {
 
   let pings = [];
   let pingIntervalId = setInterval(async () => {
-    if (signal?.aborted) return;
+    if (phaseSignal?.aborted) return;
     const latency = await probeLoadedPing(signal);
     if (latency !== null) pings.push(latency);
   }, 1000);
@@ -311,17 +363,20 @@ export async function measureUpload(onProgress = () => {}, signal) {
   const payload = createUploadPayload(8 * 1024 * 1024);
 
   let streams = [];
-  const startStream = () => uploadPayloadWithProgress(payload, calculator, signal);
+  const startStream = () => uploadPayloadWithProgress(payload, calculator, phaseSignal).then(() => {
+    if (!signal?.aborted && !phaseFinished) {
+      return startStream(); // Keep uploading if we haven't timed out
+    }
+  });
 
   // Default 4 streams
   for (let i = 0; i < 4; i++) {
-    streams.push(startStream().catch(e => { if (e.name !== 'AbortError') console.error(e); }));
+    streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
   }
 
   let scalingInterval = setInterval(() => {
-    if (calculator.getLiveSpeedMbps() > 250 && streams.length < 8) {
-      streams.push(startStream().catch(e => { if (e.name !== 'AbortError') console.error(e); }));
-      streams.push(startStream().catch(e => { if (e.name !== 'AbortError') console.error(e); }));
+    if (calculator.getLiveSpeedMbps() > 150 && streams.length < 6) {
+      streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
     }
   }, 1000);
 
@@ -332,7 +387,10 @@ export async function measureUpload(onProgress = () => {}, signal) {
     ]);
   } catch (error) {
     if (error.name === 'AbortError') throw error;
+    // Ignore Phase timeout error to gracefully finish the test phase
   } finally {
+    phaseFinished = true;
+    phaseController.abort();
     clearTimeout(timeoutId);
     clearInterval(pingIntervalId);
     clearInterval(progressIntervalId);

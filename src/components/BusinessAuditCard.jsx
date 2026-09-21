@@ -14,7 +14,7 @@ export default function BusinessAuditCard({ metrics, complete }) {
   ];
 
   return (
-    <section className="panel audit-panel">
+    <section className="panel audit-panel p-4 sm:p-6">
       <div className="panel-heading">
         <div><span className="eyebrow">Operational assessment</span><h2>Business readiness</h2></div>
         <div className={`grade ${complete ? 'ready' : ''}`}>{complete ? audit.grade : 'Pending'}</div>
