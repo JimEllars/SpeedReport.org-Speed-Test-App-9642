@@ -7,6 +7,15 @@ import { PHASE_LABELS, STATES } from '../common/testConstants';
 
 const { FiPlay, FiRefreshCw, FiStopCircle } = FiIcons;
 
+
+function getGaugeMaxScale(mbps) {
+  if (mbps <= 100) return 100;
+  if (mbps <= 1000) return 1000;
+  if (mbps <= 10000) return 10000;
+  if (mbps <= 100000) return 100000;
+  return 2000000; // 2 Tbps ceiling
+}
+
 function formatSpeed(value) {
   if (value >= 1000) {
     return `${(value / 1000).toFixed(2)} Gbps`;
@@ -68,29 +77,37 @@ export default function SpeedGauge({
   }, [targetValue, active]);
 
   const value = displayValue;
-  // Calculate percentage dynamically for non-linear scale up to 1000 Mbps
-  const scaleValue = (val) => {
-    // 0-100 Mbps takes 50% of the gauge
-    // 100-1000 Mbps takes the rest
-    if (val <= 100) return (val / 100) * 50;
-    if (val <= 1000) return 50 + ((val - 100) / 900) * 50;
-    return 100;
-  };
+  // Calculate percentage dynamically for dynamic tiering
+  const maxScaleMbps = getGaugeMaxScale(value);
+  const percent = Math.min((value / maxScaleMbps) * 100, 100);
 
-  const percent = scaleValue(value);
-  const points = samples.length
+
+  const speedPoints = samples.length
     ? samples
       .map((sample, index) => (
-        `${(index / Math.max(samples.length - 1, 1)) * 280},${55 - Math.min(sample / 20, 48)}`
+        `${(index / Math.max(samples.length - 1, 1)) * 280},${55 - Math.min((sample.value !== undefined ? sample.value : sample) / 20, 48)}`
       ))
       .join(' ')
     : '0,54 280,54';
 
+  const pingPoints = samples.length && samples.some(s => s.ping !== undefined)
+    ? samples
+      .map((sample, index) => (
+        `${(index / Math.max(samples.length - 1, 1)) * 280},${55 - Math.min((sample.ping || 0) / 10, 48)}`
+      ))
+      .join(' ')
+    : '';
+
   return (
     <section className="gauge-card">
-      <div className="status-line">
-        <span className={active ? 'pulse-dot active' : 'pulse-dot'} />
-        {PHASE_LABELS[state]}
+      <div className="status-line" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <span className={active ? 'pulse-dot active' : 'pulse-dot'} />
+          {PHASE_LABELS[state]}
+        </div>
+        <div style={{ fontSize: '10px', color: '#68778d' }}>
+          Scale: 0 &ndash; {maxScaleMbps >= 1000 ? maxScaleMbps / 1000 + ' Gbps' : maxScaleMbps + ' Mbps'}
+        </div>
       </div>
 
       <div className="gauge w-full max-w-[280px] sm:max-w-[340px] md:max-w-[420px] mx-auto" aria-live="polite" aria-valuenow={value}>
@@ -118,7 +135,8 @@ export default function SpeedGauge({
         preserveAspectRatio="none"
         aria-label="Live speed samples"
       >
-        <polyline points={points} />
+        <polyline points={speedPoints} style={{ stroke: '#38d997' }} />
+        {pingPoints && <polyline points={pingPoints} style={{ stroke: '#f5bc6e', opacity: 0.6 }} />}
       </svg>
 
       {active ? (

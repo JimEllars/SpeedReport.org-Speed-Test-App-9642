@@ -9,12 +9,13 @@ const {
   FiDownload,
   FiEye,
   FiTrash2,
-  FiTrendingUp
+  FiTrendingUp,
+  FiBookmark
 } = FiIcons;
 
-function getBarHeight(value, maximum) {
-  if (!maximum) return 8;
-  return Math.max(10, Math.round((value / maximum) * 100));
+function getBarHeight(value, maxVal) {
+  if (!maxVal) return 8;
+  return Math.max(10, Math.round((value / maxVal) * 100));
 }
 
 function formatDate(timestamp) {
@@ -24,8 +25,8 @@ function formatDate(timestamp) {
   });
 }
 
-export default function TestHistoryVault({ history, onClear, onSelect }) {
-  const maximum = Math.max(
+export default function TestHistoryVault({ history, onClear, onSelect, onTogglePin }) {
+  const maxVal = Math.max(
     ...history.map((test) => test.metrics.download),
     1
   );
@@ -102,7 +103,7 @@ export default function TestHistoryVault({ history, onClear, onSelect }) {
                     style={{
                       height: `${getBarHeight(
                         test.metrics.download,
-                        maximum
+                        maxVal
                       )}%`
                     }}
                     title={`${test.metrics.download} Mbps`}
@@ -118,7 +119,7 @@ export default function TestHistoryVault({ history, onClear, onSelect }) {
               <span>Down</span>
               <span>Up</span>
               <span>Ping</span>
-              <span>View</span>
+              <span style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>Action</span>
             </div>
 
             {history.slice(0, 6).map((test) => (
@@ -127,13 +128,23 @@ export default function TestHistoryVault({ history, onClear, onSelect }) {
                 <strong>{test.metrics.download}</strong>
                 <strong>{test.metrics.upload}</strong>
                 <span>{test.metrics.ping} ms</span>
-                <button
-                  className="history-view"
-                  onClick={() => onSelect(test)}
-                  aria-label={`View report ${test.id}`}
-                >
-                  <SafeIcon icon={FiEye} />
-                </button>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                  <button
+                    className="history-view"
+                    onClick={() => onTogglePin(test.id)}
+                    aria-label={test.pinned ? `Unpin report ${test.id}` : `Pin report ${test.id}`}
+                    style={{ color: test.pinned ? '#f5bc6e' : '#719bea' }}
+                  >
+                    <SafeIcon icon={FiBookmark} />
+                  </button>
+                  <button
+                    className="history-view"
+                    onClick={() => onSelect(test)}
+                    aria-label={`View report ${test.id}`}
+                  >
+                    <SafeIcon icon={FiEye} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

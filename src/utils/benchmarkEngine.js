@@ -219,7 +219,8 @@ export async function measureDownload(onProgress = () => {}, signal) {
 
   let progressIntervalId = setInterval(() => {
     if (performance.now() - started < 500) return; // drop warmup from UI
-    onProgress(round(calculator.getLiveSpeedMbps()));
+    const lastPing = pings.length > 0 ? pings[pings.length - 1] : undefined;
+    onProgress(round(calculator.getLiveSpeedMbps()), lastPing);
   }, 50);
 
   let streams = [];
@@ -357,7 +358,8 @@ export async function measureUpload(onProgress = () => {}, signal) {
 
   let progressIntervalId = setInterval(() => {
     if (performance.now() - started < 500) return;
-    onProgress(round(calculator.getLiveSpeedMbps()));
+    const lastPing = pings.length > 0 ? pings[pings.length - 1] : undefined;
+    onProgress(round(calculator.getLiveSpeedMbps()), lastPing);
   }, 50);
 
   const payload = createUploadPayload(8 * 1024 * 1024);
