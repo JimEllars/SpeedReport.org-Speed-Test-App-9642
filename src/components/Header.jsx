@@ -2,13 +2,28 @@ import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { useState, useEffect } from 'react';
 
-const { FiActivity, FiShield, FiLock } = FiIcons;
+const { FiActivity, FiShield, FiLock, FiSun, FiMoon } = FiIcons;
 
 export default function Header() {
   const [edgeStatus, setEdgeStatus] = useState('Checking...');
   const [colo, setColo] = useState('');
   const [protocol, setProtocol] = useState('');
   const [isHealthy, setIsHealthy] = useState(false);
+
+  const [theme, setTheme] = useState(() => {
+    const saved = localStorage.getItem('speedreport-theme');
+    return saved || 'dark';
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('speedreport-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
 
   useEffect(() => {
     let isMounted = true;
@@ -50,8 +65,17 @@ export default function Header() {
         {isHealthy && colo && protocol && (
           <span className="badge">🟢 Edge: {colo} &middot; {protocol}</span>
         )}
+
         <span><SafeIcon icon={FiShield} /> Edge tested</span>
         <span><SafeIcon icon={FiLock} /> Private by design</span>
+        <button
+          onClick={toggleTheme}
+          style={{ background: 'transparent', border: 'none', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4px' }}
+          aria-label="Toggle theme"
+        >
+          <SafeIcon icon={theme === 'dark' ? FiSun : FiMoon} />
+        </button>
+
       </div>
     </header>
   );

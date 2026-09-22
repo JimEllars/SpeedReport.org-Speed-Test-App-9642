@@ -9,8 +9,18 @@ const maskIp = (ip) => {
   return ip.includes(':') ? `${ip.slice(0, 7)}••••` : ip.replace(/\d+$/, '•••');
 };
 
-export default function ISPDetailsCard({ meta }) {
+export default function ISPDetailsCard({ meta, metrics }) {
   const [visible, setVisible] = useState(false);
+
+  const getRegionalBenchmark = () => {
+    if (!metrics || !metrics.download) return null;
+    const speed = Math.max(metrics.download, metrics.upload || 0);
+    if (speed > 500) return 'Top 5% Commercial Fiber';
+    if (speed >= 100) return 'Above Regional Average';
+    return 'Standard Broadband Tier';
+  };
+
+  const benchmark = getRegionalBenchmark();
 
   return (
     <section className="panel p-4 sm:p-6">
@@ -42,6 +52,7 @@ export default function ISPDetailsCard({ meta }) {
           <dt>Network</dt>
           <dd>{meta ? `AS${meta.asn}` : '—'}</dd>
         </div>
+
         <div>
           <dt>Edge node</dt>
           <dd>
@@ -49,6 +60,16 @@ export default function ISPDetailsCard({ meta }) {
             {meta ? `${meta.city}, ${meta.country} · ${meta.colo || 'Nearest'}` : '—'}
           </dd>
         </div>
+        {benchmark && (
+          <div>
+            <dt>Regional Rating</dt>
+            <dd>
+              <span style={{ display: 'inline-block', padding: '2px 8px', background: 'var(--accent-color, #2563EB)', color: '#fff', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold' }}>
+                {benchmark}
+              </span>
+            </dd>
+          </div>
+        )}
       </dl>
     </section>
   );
