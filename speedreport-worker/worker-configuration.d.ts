@@ -10,7 +10,13 @@ declare namespace Cloudflare {
 	}
 	interface Env extends __BaseEnv_Env {}
 }
-interface Env extends __BaseEnv_Env {}
+interface Env extends __BaseEnv_Env {
+	TELEMETRY?: any;
+	RESEND_API_KEY?: string;
+	REPORT_RECIPIENT_TO?: string;
+	REPORT_RECIPIENT_BCC?: string;
+	ADMIN_SECRET?: string;
+}
 
 // Begin runtime types
 /*! *****************************************************************************
