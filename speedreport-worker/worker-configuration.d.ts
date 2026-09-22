@@ -13833,6 +13833,7 @@ declare namespace Cloudflare {
     //
     // You can use `wrangler types` to generate the `Env` type automatically.
     interface Env {
+  TELEMETRY: AnalyticsEngineDataset;
     }
     // Project-specific parameters used to inform types.
     //

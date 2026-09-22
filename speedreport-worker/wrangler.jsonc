@@ -22,5 +22,11 @@
       "/api/*",
       "/health"
     ]
-  }
+  },
+  "analytics_engine_datasets": [
+    {
+      "binding": "TELEMETRY",
+      "dataset": "speedreport_telemetry"
+    }
+  ]
 }
