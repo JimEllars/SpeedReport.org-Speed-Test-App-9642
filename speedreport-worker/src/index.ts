@@ -47,24 +47,28 @@ export default {
 
     if (url.pathname === '/api/telemetry' && request.method === 'POST') {
       try {
+        const body: any = await request.json();
+        const dataPoint = {
+          blobs: [
+            body.bufferbloatGrade || 'unknown',
+            body.colo || 'unknown',
+            String(body.asn || 'unknown')
+          ],
+          doubles: [
+            body.downloadMbps || 0,
+            body.uploadMbps || 0,
+            body.idlePingMs || 0,
+            body.jitterMs || 0,
+            body.loadedPingMs || 0
+          ],
+          indexes: [body.colo || 'unknown']
+        };
+
         if (env.TELEMETRY) {
-          const body: any = await request.json();
           // Write non-PII test metrics to Cloudflare Analytics Engine
-          env.TELEMETRY.writeDataPoint({
-            blobs: [
-              body.bufferbloatGrade || 'unknown',
-              body.colo || 'unknown',
-              String(body.asn || 'unknown')
-            ],
-            doubles: [
-              body.downloadMbps || 0,
-              body.uploadMbps || 0,
-              body.idlePingMs || 0,
-              body.jitterMs || 0,
-              body.loadedPingMs || 0
-            ],
-            indexes: [body.colo || 'unknown']
-          });
+          env.TELEMETRY.writeDataPoint(dataPoint);
+        } else {
+          console.log('Telemetry fallback:', dataPoint);
         }
       } catch (err) {
         // Safe to ignore, ensuring edge telemetry ingestion non-blocking
