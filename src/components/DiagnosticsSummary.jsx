@@ -80,6 +80,12 @@ export default function DiagnosticsSummary({ report }) {
         ))}
       </div>
 
+
+      {(metrics.loss > 0.5 || metrics.loadedJitter > 20) && (
+        <div style={{ marginTop: '16px', padding: '12px 16px', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '8px', color: '#F59E0B', fontSize: '12px' }}>
+          ⚠️ High loaded jitter detected: Voice calls and video meetings may experience clipping during heavy uploads. Consider enabling Smart Queue Management (SQM) on your router.
+        </div>
+      )}
       <p className="diagnostic-note">
         Bufferbloat measures the increase in latency when your connection is carrying
         heavy download and upload traffic. Lower increases indicate a more responsive

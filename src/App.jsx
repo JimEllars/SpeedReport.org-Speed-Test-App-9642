@@ -131,7 +131,7 @@ useEffect(() => {
               </div>
             )}
 
-            <ISPDetailsCard meta={displayedMeta} />
+            <ISPDetailsCard meta={displayedMeta} metrics={displayedMetrics} />
           </div>
         </div>
 

@@ -1,5 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { formatDuration, getReadiness } from './readiness';
+import QRCode from 'qrcode';
+import { createReportShareUrl } from './reportShareLinks';
 
 export async function downloadReport(report) {
   const pdf = await PDFDocument.create();
@@ -169,6 +171,28 @@ export async function downloadReport(report) {
       color: muted
     }
   );
+
+
+  const shareUrl = createReportShareUrl(report);
+  const qrDataUrl = await QRCode.toDataURL(shareUrl, { width: 100, margin: 0 });
+  const qrImage = await pdf.embedPng(qrDataUrl);
+
+  const qrDims = qrImage.scale(0.8);
+
+  page.drawImage(qrImage, {
+    x: width - 42 - qrDims.width,
+    y: 92 - (qrDims.height / 2) + 32,
+    width: qrDims.width,
+    height: qrDims.height,
+  });
+
+  page.drawText('Scan to verify digital certificate on SpeedReport.org', {
+    x: width - 58 - 180, // Approximate positioning
+    y: 75,
+    size: 8,
+    font: regular,
+    color: muted,
+  });
 
   const bytes = await pdf.save();
   const url = URL.createObjectURL(

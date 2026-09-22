@@ -8,10 +8,32 @@
   box-sizing: border-box;
 }
 
-html {
-  background: #080c14;
-  scroll-behavior: smooth;
+
+:root {
+  --bg-color: #080c14;
+  --text-color: #ffffff;
+  --card-bg: rgba(8, 14, 24, .42);
+  --card-border: #202d40;
+  --accent-color: #2563eb;
+  --text-muted: #8794a8;
 }
+
+[data-theme="light"] {
+  --bg-color: #F8FAFC;
+  --text-color: #0F172A;
+  --card-bg: #FFFFFF;
+  --card-border: #E2E8F0;
+  --accent-color: #2563EB;
+  --text-muted: #64748B;
+}
+
+html {
+  background: var(--bg-color);
+  color: var(--text-color);
+  scroll-behavior: smooth;
+  transition: background-color 0.3s, color 0.3s;
+}
+
 
 body {
   -webkit-font-smoothing: antialiased;

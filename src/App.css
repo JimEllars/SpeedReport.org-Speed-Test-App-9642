@@ -1,17 +1,16 @@
 :root {
-  color: #e7edf8;
-  background: #080c14;
+  color: var(--text-color);
+  background: var(--bg-color);
   font-family: 'DM Sans', sans-serif;
 }
+
 
 body {
   min-width: 320px;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 15% -10%, rgba(37, 99, 235, 0.14), transparent 34rem),
-    radial-gradient(circle at 90% 20%, rgba(16, 185, 129, 0.07), transparent 30rem),
-    #080c14;
+  background: var(--bg-color);
 }
+
 
 button {
   font: inherit;
@@ -484,9 +483,9 @@ main {
   position: relative;
   min-height: 155px;
   padding: 16px;
-  border: 1px solid #202d40;
+  border: 1px solid var(--card-border);
   border-radius: 12px;
-  background: rgba(8, 14, 24, .42);
+  background: var(--card-bg);
 }
 
 .diagnostic-icon {
@@ -645,7 +644,7 @@ main {
   padding: 13px 15px 12px;
   border: 1px solid #1e2a3a;
   border-radius: 12px;
-  background: rgba(8, 14, 24, .5);
+  background: var(--card-bg);
 }
 
 .chart-label {
