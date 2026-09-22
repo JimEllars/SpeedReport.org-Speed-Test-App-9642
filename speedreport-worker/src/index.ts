@@ -1,6 +1,6 @@
-
 interface Env {
   ASSETS: { fetch: typeof fetch };
+  TELEMETRY?: any;
 }
 import { handleDownload } from './download';
 import { cors, json, telemetryHeaders } from './http';
@@ -43,6 +43,39 @@ export default {
 
     if (url.pathname === '/api/upload' && request.method === 'POST') {
       return handleUpload(request);
+    }
+
+    if (url.pathname === '/api/telemetry' && request.method === 'POST') {
+      try {
+        if (env.TELEMETRY) {
+          const body: any = await request.json();
+          // Write non-PII test metrics to Cloudflare Analytics Engine
+          env.TELEMETRY.writeDataPoint({
+            blobs: [
+              body.bufferbloatGrade || 'unknown',
+              body.colo || 'unknown',
+              String(body.asn || 'unknown')
+            ],
+            doubles: [
+              body.downloadMbps || 0,
+              body.uploadMbps || 0,
+              body.idlePingMs || 0,
+              body.jitterMs || 0,
+              body.loadedPingMs || 0
+            ],
+            indexes: [body.colo || 'unknown']
+          });
+        }
+      } catch (err) {
+        // Safe to ignore, ensuring edge telemetry ingestion non-blocking
+      }
+      return new Response(null, {
+        status: 202,
+        headers: {
+          ...cors,
+          'Content-Length': '0'
+        }
+      });
     }
 
     return env.ASSETS.fetch(request);

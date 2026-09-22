@@ -1,3 +1,4 @@
+import { sendAnonymousTelemetry } from "../utils/telemetry";
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { STATES } from '../common/testConstants';
@@ -130,6 +131,7 @@ export function useSpeedTest(onComplete) {
       if (partialFailure) {
         setError('Test completed partially due to network instability.');
       }
+      sendAnonymousTelemetry(report);
       onComplete(report);
     } catch (reason) {
       if (reason.name === 'AbortError') {
