@@ -6,27 +6,32 @@
   "workers_dev": true,
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1
+    "head_sampling_rate": 1,
   },
   "routes": [
     {
       "pattern": "speedreport.org",
-      "custom_domain": true
-    }
+      "custom_domain": true,
+    },
   ],
   "assets": {
     "directory": "../dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": [
-      "/api/*",
-      "/health"
-    ]
+    "run_worker_first": ["/api/*", "/health"],
   },
   "analytics_engine_datasets": [
     {
       "binding": "TELEMETRY",
-      "dataset": "speedreport_telemetry"
-    }
-  ]
+      "dataset": "speedreport_telemetry",
+    },
+  ],
+  "triggers": {
+    "crons": ["0 12 * * *"],
+  },
+  "vars": {
+    "RESEND_API_KEY": "",
+    "REPORT_RECIPIENT_TO": "james.ellars@axim.us.com",
+    "REPORT_RECIPIENT_BCC": "jrellars@gmail.com",
+  },
 }
