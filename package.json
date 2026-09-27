@@ -9,9 +9,9 @@
     "lint": "eslint .",
     "lint:error": "eslint . --quiet",
     "test": "vitest run",
-    "preview": "npm run build && wrangler dev",
-    "deploy": "npm run build && wrangler deploy",
-    "deploy:dry-run": "npm run build && npm --prefix speedreport-worker exec wrangler deploy --dry-run"
+    "preview": "npm run build && npm --prefix speedreport-worker run dev",
+    "deploy": "npm run build && npm --prefix speedreport-worker run deploy",
+    "deploy:dry-run": "npm run build && npm --prefix speedreport-worker run deploy -- --dry-run"
   },
   "dependencies": {
     "@questlabs/react-sdk": "^2.2.92",

@@ -1,4 +1,7 @@
 {
+  // Release workflow: run `npm run deploy:dry-run`, open a PR, then let the
+  // maintainer merge it. Configure secrets with `wrangler secret put`; never
+  // add secrets or patch artifacts to this file.
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "speedreport-edge-engine",
   "main": "src/index.ts",
@@ -30,7 +33,6 @@
     "crons": ["0 12 * * *"],
   },
   "vars": {
-    "RESEND_API_KEY": "",
     "REPORT_RECIPIENT_TO": "james.ellars@axim.us.com",
     "REPORT_RECIPIENT_BCC": "jrellars@gmail.com",
   },
