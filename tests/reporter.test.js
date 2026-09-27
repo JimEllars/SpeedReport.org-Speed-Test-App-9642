@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest';
-import { qualifyLeads, aggregateStatistics, generateHTMLReport } from '../speedreport-worker/src/executiveReporter';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  qualifyLeads,
+  aggregateStatistics,
+  generateHTMLReport,
+  runExecutiveReportCron,
+} from '../speedreport-worker/src/executiveReporter';
 
 describe('Executive Reporter & Lead Aggregator', () => {
   it('correctly qualifies leads based on degraded connection rules', () => {
@@ -59,5 +64,19 @@ describe('Executive Reporter & Lead Aggregator', () => {
     // Ensure we can see some degraded metrics
     expect(html).toContain('100.0%');
     expect(html.length).toBeGreaterThan(100);
+  });
+
+  it('completes a dry run when an email API key is unavailable', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(runExecutiveReportCron({})).resolves.toEqual({
+      success: true,
+      dryRun: true,
+    });
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('executive_report.dry_run'),
+    );
+    warn.mockRestore();
   });
 });

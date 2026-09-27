@@ -32,8 +32,18 @@ custom domain on the authenticated Cloudflare account.
 npm install
 npm --prefix speedreport-worker install
 npm run deploy:dry-run
-npm run deploy
 ```
 
-After deployment, verify `https://speedreport.org/health` and run a full speed
-test from `https://speedreport.org/`.
+Configure the required Worker secrets once in the Cloudflare account; do not
+put them in `wrangler.jsonc`, `.env`, patch files, or a pull request:
+
+```sh
+npm --prefix speedreport-worker exec wrangler secret put ADMIN_SECRET
+npm --prefix speedreport-worker exec wrangler secret put RESEND_API_KEY
+```
+
+For every release, run `npm run lint`, `npm test`, `npm run build`, and
+`npm run deploy:dry-run`. Push the feature branch, open a pull request, and
+have a maintainer merge it; production deployment follows the repository's
+Cloudflare workflow. After deployment, verify `https://speedreport.org/health`
+and run a full speed test from `https://speedreport.org/`.

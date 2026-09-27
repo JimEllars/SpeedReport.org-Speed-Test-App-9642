@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy --config wrangler.jsonc",
+    "typecheck": "tsc --noEmit",
+    "types": "wrangler types --config wrangler.jsonc"
   },
   "devDependencies": {
     "wrangler": "^4.11.1"
