@@ -7,6 +7,7 @@ export function handleMeta(request: Request): Response {
     return json({
       ip: request.headers.get('cf-connecting-ip') || '127.0.0.1',
       isp: 'Local Testing',
+      asOrganization: 'Local Testing',
       asn: 0,
       city: 'Local',
       region: '',
@@ -23,6 +24,7 @@ export function handleMeta(request: Request): Response {
   return json({
     ip: request.headers.get('cf-connecting-ip') || 'Unknown',
     isp: cf.asOrganization || 'Commercial Broadband',
+    asOrganization: cf.asOrganization || 'Commercial Broadband',
     asn: cf.asn || 0,
     city: cf.city || 'Local',
     region: cf.region || '',

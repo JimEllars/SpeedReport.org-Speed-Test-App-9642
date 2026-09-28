@@ -19,7 +19,7 @@ export async function handleUpload(request: Request): Promise<Response> {
   try {
     while (true) {
       if (request.signal.aborted) {
-        return json({ error: 'Upload was cancelled' }, 499, request);
+        break;
       }
 
       const { done, value } = await reader.read();

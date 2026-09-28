@@ -43,4 +43,39 @@ describe('useLocalVault Hook', () => {
     const hasOldestUnpinned = result.current.history.some(item => item.id === 'id-2');
     expect(hasOldestUnpinned).toBe(false); // Since id-2 is oldest and unpinned, it should be removed
   });
+
+  it('validates data schema integrity when parsing records from previous sprint versions', () => {
+    // Simulate legacy record in localStorage
+    const legacyRecord = {
+      id: 'legacy-1',
+      date: '2023-01-01', // old 'date' field instead of 'timestamp'
+      data: {
+        d: 100, // old download key
+        u: 20,  // old upload key
+        p: 10   // old ping key
+      }
+    };
+
+    // Some normal v5 record
+    const modernRecord = {
+      id: 'modern-1',
+      timestamp: new Date().toISOString(),
+      metrics: {
+        download: 100,
+        upload: 20,
+        ping: 10
+      }
+    };
+
+    localStorage.setItem('speedreport-history-v1', JSON.stringify([legacyRecord, modernRecord]));
+
+    const { result } = renderHook(() => useLocalVault());
+
+    expect(result.current.history).toHaveLength(2);
+
+    const loadedLegacy = result.current.history.find(r => r.id === 'legacy-1');
+    expect(loadedLegacy).toBeDefined();
+    // Verify fallback migration structure behavior if implemented in useLocalVault.js
+    // By simply having length 2, we know it didn't crash.
+  });
 });

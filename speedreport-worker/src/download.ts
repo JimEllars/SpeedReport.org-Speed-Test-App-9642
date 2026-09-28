@@ -1,4 +1,4 @@
-import { cors, telemetryHeaders } from './http';
+import { getCorsHeaders, telemetryHeaders } from './http';
 
 const CHUNK_SIZE = 64 * 1024;
 const DEFAULT_BYTES = 25 * 1024 * 1024;
@@ -13,6 +13,9 @@ export function handleDownload(request: Request, url: URL): Response {
   let sent = 0;
 
   const stream = new ReadableStream({
+    cancel() {
+      // Abort controller handled in pull already but we can provide explicit cancel
+    },
     pull(controller) {
       if (request.signal.aborted) {
         controller.close();
@@ -32,7 +35,7 @@ export function handleDownload(request: Request, url: URL): Response {
 
   return new Response(stream, {
     headers: {
-      ...cors,
+      ...getCorsHeaders(request),
       ...telemetryHeaders(request),
       'Content-Type': 'application/octet-stream',
       'Content-Length': String(target),

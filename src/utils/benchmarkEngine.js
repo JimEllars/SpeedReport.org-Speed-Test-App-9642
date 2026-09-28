@@ -19,16 +19,36 @@ function throwIfAborted(signal) {
 }
 
 export async function fetchMeta(signal) {
-  const response = await fetch(endpoint('/api/meta'), requestOptions(signal));
+  try {
+    const response = await fetch(endpoint('/api/meta'), requestOptions(signal));
 
-  if (!response.ok) {
-    throw new Error('Metadata service unavailable');
+    if (!response.ok) {
+      throw new Error('Metadata service unavailable');
+    }
+
+    const data = await response.json();
+    const cfColo = response.headers.get('cf-colo');
+    const serverTiming = response.headers.get('Server-Timing');
+    return { ...data, cfColo, serverTiming };
+  } catch (error) {
+    if (error.name === 'AbortError') throw error;
+    // Degraded fallback mode
+    console.warn("Metadata endpoint failed, falling back to local defaults");
+    return {
+      ip: 'Unknown',
+      isp: 'Unknown ISP',
+      asn: 0,
+      city: 'Unknown',
+      region: '',
+      country: 'US',
+      postalCode: '',
+      latitude: '',
+      longitude: '',
+      colo: 'Unknown',
+      httpProtocol: 'unknown',
+      tlsVersion: 'unknown'
+    };
   }
-
-  const data = await response.json();
-  const cfColo = response.headers.get('cf-colo');
-  const serverTiming = response.headers.get('Server-Timing');
-  return { ...data, cfColo, serverTiming };
 }
 
 export async function measurePing(samples = 10, signal) {
@@ -70,18 +90,25 @@ export async function measurePing(samples = 10, signal) {
     throw new Error('Edge testing service is unreachable');
   }
 
-  const average = readings.reduce((sum, value) => sum + value, 0) / readings.length;
-  const variance = readings.reduce(
+  const validReadings = readings.filter(r => Number.isFinite(r) && r >= 0);
+  if (!validReadings.length) {
+    throw new Error('Edge testing service is unreachable');
+  }
+
+  const average = validReadings.reduce((sum, value) => sum + value, 0) / validReadings.length;
+  const variance = validReadings.reduce(
     (sum, value) => sum + ((value - average) ** 2),
     0
-  ) / readings.length;
+  ) / validReadings.length;
+
+  const jitter = Math.sqrt(variance);
 
   return {
     ping: round(average),
-    jitter: round(Math.sqrt(variance)),
+    jitter: Number.isFinite(jitter) && jitter >= 0 ? round(jitter) : 0,
     loss: round((lost / samples) * 100),
-    min: round(Math.min(...readings)),
-    max: round(Math.max(...readings)),
+    min: round(Math.min(...validReadings)),
+    max: round(Math.max(...validReadings)),
     telemetry
   };
 }

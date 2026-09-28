@@ -1,6 +1,6 @@
 import { handleDownload } from "./download";
 import { runExecutiveReportCron } from "./executiveReporter";
-import { cors, json, telemetryHeaders } from "./http";
+import { getCorsHeaders, json, telemetryHeaders } from "./http";
 import { handleMeta } from "./meta";
 import { handleUpload } from "./upload";
 
@@ -30,7 +30,7 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: cors });
+      return new Response(null, { status: 204, headers: getCorsHeaders(request) });
     }
 
     if (url.pathname === "/api/admin/trigger-report" && request.method === "POST") {
@@ -60,7 +60,7 @@ export default {
       return new Response(null, {
         status: 204,
         headers: {
-          ...cors,
+          ...getCorsHeaders(request),
           ...telemetryHeaders(request),
           "Content-Length": "0",
         },
@@ -110,7 +110,7 @@ export default {
 
       return new Response(null, {
         status: 202,
-        headers: { ...cors, "Content-Length": "0" },
+        headers: { ...getCorsHeaders(request), "Content-Length": "0" },
       });
     }
 
