@@ -1,4 +1,4 @@
-import { getCorsHeaders } from "./http";
+import { getCorsHeaders, errorJson } from "./http";
 
 export interface TelemetryPayload {
   sessionId?: string;
@@ -21,60 +21,72 @@ export interface TelemetryPayload {
 export async function handleTelemetry(request: Request, env: any): Promise<Response> {
   try {
     const body: unknown = await request.json();
-    if (!body || typeof body !== "object") {
-      return new Response("Invalid telemetry payload", { status: 400 });
+
+    let payloads: any[] = [];
+    if (Array.isArray(body)) {
+      payloads = body;
+    } else if (body && typeof body === "object") {
+      payloads = [body];
+    } else {
+      return errorJson("Invalid telemetry payload", "invalid_payload", 400, request);
     }
 
-    const payload = body as any;
+    let processedCount = 0;
 
-    // Validate fields according to new format
-    let sessionId = payload.sessionId;
-    let clientTimestamp = payload.clientTimestamp;
+    for (const payload of payloads) {
+      if (!payload || typeof payload !== "object") {
+        continue;
+      }
 
-    // We can accept the old format which might be flat, or the new structured format.
-    let pingMs = payload.metrics?.pingMs ?? payload.idlePingMs ?? 0;
-    let downloadMbps = payload.metrics?.downloadMbps ?? payload.downloadMbps ?? 0;
-    let uploadMbps = payload.metrics?.uploadMbps ?? payload.uploadMbps ?? 0;
-    let jitterMs = payload.metrics?.jitterMs ?? payload.jitterMs ?? 0;
-    let packetLossPct = payload.metrics?.packetLossPct ?? payload.packetLossPct ?? 0;
+      // Validate fields according to new format
+      let sessionId = payload.sessionId;
+      let clientTimestamp = payload.clientTimestamp;
 
-    let userAgent = payload.clientMetadata?.userAgent ?? payload.client?.userAgent ?? "unknown";
-    let isp = payload.clientMetadata?.isp ?? payload.asn ?? "unknown"; // Fallback to ASN
-    let colocation = payload.clientMetadata?.colocation ?? payload.colo ?? "unknown";
+      // We can accept the old format which might be flat, or the new structured format.
+      let pingMs = payload.metrics?.pingMs ?? payload.idlePingMs ?? 0;
+      let downloadMbps = payload.metrics?.downloadMbps ?? payload.downloadMbps ?? 0;
+      let uploadMbps = payload.metrics?.uploadMbps ?? payload.uploadMbps ?? 0;
+      let jitterMs = payload.metrics?.jitterMs ?? payload.jitterMs ?? 0;
+      let packetLossPct = payload.metrics?.packetLossPct ?? payload.packetLossPct ?? 0;
 
-    let bufferbloatGrade = payload.bufferbloatGrade ?? "unknown";
+      let userAgent = payload.clientMetadata?.userAgent ?? payload.client?.userAgent ?? "unknown";
+      let isp = payload.clientMetadata?.isp ?? payload.asn ?? "unknown"; // Fallback to ASN
+      let colocation = payload.clientMetadata?.colocation ?? payload.colo ?? "unknown";
 
-    if (sessionId && typeof sessionId !== "string") {
-      return new Response("Invalid sessionId", { status: 400 });
+      let bufferbloatGrade = payload.bufferbloatGrade ?? "unknown";
+
+      if (sessionId && typeof sessionId !== "string") {
+        continue;
+      }
+
+      if (clientTimestamp && typeof clientTimestamp !== "string") {
+        continue;
+      }
+
+      env.TELEMETRY.writeDataPoint({
+        blobs: [
+          String(bufferbloatGrade),
+          String(colocation),
+          String(isp),
+          String(sessionId ?? "unknown"),
+          String(userAgent)
+        ],
+        doubles: [
+          Number(downloadMbps) || 0,
+          Number(uploadMbps) || 0,
+          Number(pingMs) || 0,
+          Number(jitterMs) || 0,
+          Number(packetLossPct) || 0,
+        ],
+        indexes: [String(colocation)],
+      });
+      processedCount++;
     }
 
-    if (clientTimestamp && typeof clientTimestamp !== "string") {
-      return new Response("Invalid clientTimestamp", { status: 400 });
-    }
-
-    // Extract timestamp if valid ISO string
     let recordedAt = new Date().toISOString();
 
-    env.TELEMETRY.writeDataPoint({
-      blobs: [
-        String(bufferbloatGrade),
-        String(colocation),
-        String(isp),
-        String(sessionId ?? "unknown"),
-        String(userAgent)
-      ],
-      doubles: [
-        Number(downloadMbps) || 0,
-        Number(uploadMbps) || 0,
-        Number(pingMs) || 0,
-        Number(jitterMs) || 0,
-        Number(packetLossPct) || 0,
-      ],
-      indexes: [String(colocation)],
-    });
-
-    return new Response(JSON.stringify({ success: true, recordedAt }), {
-      status: 200,
+    return new Response(JSON.stringify({ success: true, recordedAt, processedCount }), {
+      status: 202,
       headers: {
         ...getCorsHeaders(request),
         "Content-Type": "application/json"
@@ -88,6 +100,13 @@ export async function handleTelemetry(request: Request, env: any): Promise<Respo
         error: error instanceof Error ? error.message : String(error),
       }),
     );
-    return new Response("Invalid telemetry payload", { status: 400 });
+    // Don't throw 500 status codes for malformed entries
+    return new Response(JSON.stringify({ success: true, ignored: true }), {
+      status: 202,
+      headers: {
+        ...getCorsHeaders(request),
+        "Content-Type": "application/json"
+      }
+    });
   }
 }

@@ -1,7 +1,6 @@
-
 export const defaultCorsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Cache-Control',
+  'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, X-Session-ID',
   'Access-Control-Expose-Headers': 'Server-Timing, cf-ray, cf-colo, cf-proto, X-Received-Bytes, X-Duration-Ms',
   'Access-Control-Max-Age': '86400',
   'Timing-Allow-Origin': '*',
@@ -63,4 +62,30 @@ export function json(data: unknown, status = 200, request?: Request): Response {
       'Content-Type': 'application/json'
     }
   });
+}
+
+export function errorJson(
+  message: string,
+  code: string,
+  status = 400,
+  request?: Request
+): Response {
+  return new Response(
+    JSON.stringify({
+      success: false,
+      error: {
+        code,
+        message,
+        timestamp: new Date().toISOString()
+      }
+    }),
+    {
+      status,
+      headers: {
+        ...getCorsHeaders(request),
+        ...(request ? telemetryHeaders(request) : {}),
+        "Content-Type": "application/json"
+      }
+    }
+  );
 }
