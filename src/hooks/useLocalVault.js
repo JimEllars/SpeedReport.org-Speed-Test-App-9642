@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 const STORAGE_KEY = 'speedreport-history-v1';
-const MAX_HISTORY = 50;
+const MAX_HISTORY = 100;
 
 function readReports() {
   try {
@@ -10,7 +10,6 @@ function readReports() {
 
     if (!Array.isArray(parsed)) return [];
 
-    // Backward compatibility for loadedPingDownload / loadedPingUpload
     return parsed.map(report => {
       if (report.metrics) {
         if (report.metrics.loadedPingDownload === undefined) {
@@ -19,7 +18,13 @@ function readReports() {
         if (report.metrics.loadedPingUpload === undefined) {
           report.metrics.loadedPingUpload = report.metrics.loadedPing || report.metrics.ping;
         }
+        if (report.metrics.packetLoss === undefined) {
+          report.metrics.packetLoss = 0;
+        }
       }
+      if (!report.meta) report.meta = {};
+      if (!report.meta.asn) report.meta.asn = "Unknown";
+
       return report;
     });
   } catch {
@@ -30,6 +35,49 @@ function readReports() {
 export function useLocalVault() {
   const [storageUsagePercent, setStorageUsagePercent] = useState(0);
   const [history, setHistory] = useState([]);
+
+  const exportVaultToJson = useCallback(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) return null;
+      return stored;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const importVaultFromJson = useCallback((jsonString) => {
+    try {
+      const parsed = JSON.parse(jsonString);
+      if (!Array.isArray(parsed)) return false;
+      const validData = parsed.filter(item => item && item.id && item.metrics);
+      if (validData.length === 0) return false;
+
+      setHistory(currentHistory => {
+        const nextMap = new Map();
+        currentHistory.forEach(r => nextMap.set(r.id, r));
+        validData.forEach(r => nextMap.set(r.id, r));
+
+        const combined = Array.from(nextMap.values()).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        const pinned = combined.filter(i => i.pinned);
+        const unpinned = combined.filter(i => !i.pinned);
+        let nextUnpinned = unpinned;
+        if (pinned.length + unpinned.length > MAX_HISTORY) {
+          nextUnpinned = unpinned.slice(0, Math.max(0, MAX_HISTORY - pinned.length));
+        }
+
+        let next = [...pinned, ...nextUnpinned].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+        setStorageUsagePercent(Math.round((next.length / MAX_HISTORY) * 100));
+        return next;
+      });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     const loaded = readReports();
@@ -68,7 +116,8 @@ export function useLocalVault() {
           const nextPinned = next.filter(i => i.pinned);
           const nextNonPinned = next.filter(i => !i.pinned);
           if (nextNonPinned.length > 0) {
-            const prunedNonPinned = nextNonPinned.slice(0, nextNonPinned.length - 1);
+            const numToPrune = Math.max(1, Math.ceil(nextNonPinned.length * 0.15));
+            const prunedNonPinned = nextNonPinned.slice(0, Math.max(0, nextNonPinned.length - numToPrune));
             const pruned = [...nextPinned, ...prunedNonPinned].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
             try {
               localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
@@ -103,7 +152,6 @@ export function useLocalVault() {
   }, []);
 
   const clear = useCallback(() => {
-
     localStorage.removeItem(STORAGE_KEY);
     setHistory([]);
     setStorageUsagePercent(0);
@@ -115,6 +163,8 @@ export function useLocalVault() {
     save,
     clear,
     togglePin,
-    storageUsagePercent
+    storageUsagePercent,
+    exportVaultToJson,
+    importVaultFromJson
   };
 }
