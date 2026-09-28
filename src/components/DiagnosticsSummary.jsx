@@ -24,7 +24,7 @@ export default function DiagnosticsSummary({ report }) {
   const rows = [
     {
       icon: FiClock,
-      label: 'Idle latency',
+      label: 'Latency',
       value: `${metrics.ping} ms`,
       detail: `${metrics.min}–${metrics.max} ms observed range`,
       state: latencyStatus

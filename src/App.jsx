@@ -95,7 +95,7 @@ useEffect(() => {
   const previousReport = history.find((item) => item.id !== report?.id);
 
   return (
-    <div className="app-shell w-full max-w-full overflow-x-hidden">
+    <div className="app-shell min-h-screen w-full max-w-full overflow-x-hidden bg-slate-950 text-white px-4 sm:px-6 lg:px-8">
       <Header />
 
       <main>
@@ -114,7 +114,7 @@ useEffect(() => {
           </p>
         </section>
 
-        <div className="dashboard-grid">
+        <div className="dashboard-grid w-full max-w-md sm:max-w-xl md:max-w-2xl mx-auto">
           <SpeedGauge
             {...test}
             onStart={test.start}

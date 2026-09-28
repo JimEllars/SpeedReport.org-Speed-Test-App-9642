@@ -40,7 +40,7 @@ export default function ReportComparisonCard({ currentReport, previousReport }) 
       delta: difference(currentReport.metrics.upload, previousReport.metrics.upload)
     },
     {
-      label: 'Idle latency',
+      label: 'Latency',
       current: `${currentReport.metrics.ping} ms`,
       delta: difference(currentReport.metrics.ping, previousReport.metrics.ping),
       inverse: true
