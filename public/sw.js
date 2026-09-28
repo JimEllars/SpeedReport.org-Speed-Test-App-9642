@@ -31,6 +31,18 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  const BYPASS_URL_PATTERNS = [
+    /\/api\/download/,
+    /\/api\/upload/,
+    /\/api\/meta/,
+    /\/api\/telemetry/,
+    /\/download/,
+    /\/upload/
+  ];
+  if (BYPASS_URL_PATTERNS.some(pattern => pattern.test(event.request.url))) {
+    return; // Bypass Service Worker cache entirely, delegate to direct edge fetch
+  }
+
   // NetworkOnly for /api/* and /health
   if (url.pathname.startsWith('/api/') || url.pathname === '/health') {
     event.respondWith(fetch(event.request));

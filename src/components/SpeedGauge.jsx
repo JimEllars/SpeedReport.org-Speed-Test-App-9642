@@ -110,7 +110,7 @@ export default function SpeedGauge({
         </div>
       </div>
 
-      <div className="gauge w-full max-w-full flex flex-col items-center justify-center overflow-hidden" aria-live="polite" aria-valuenow={value}>
+      <div className="gauge w-full max-w-full flex flex-col items-center justify-center overflow-hidden" aria-live="polite" role="status" aria-valuenow={value}>
         <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet" className="w-full h-auto max-w-[280px] sm:max-w-[340px] md:max-w-[380px] mx-auto overflow-visible" aria-label={`${value} megabits per second`}>
           <path className="gauge-track" d="M40 200 A160 160 0 0 1 360 200" />
           <motion.path

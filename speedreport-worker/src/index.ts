@@ -3,6 +3,7 @@ import { runExecutiveReportCron } from "./executiveReporter";
 import { getCorsHeaders, json, telemetryHeaders } from "./http";
 import { handleMeta } from "./meta";
 import { handleUpload } from "./upload";
+import { handleTelemetry } from "./telemetry";
 
 interface WorkerEnv {
   ASSETS: Fetcher;
@@ -30,7 +31,11 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: getCorsHeaders(request) });
+      const headers = getCorsHeaders(request);
+      if (url.pathname === "/api/telemetry" || url.pathname === "/telemetry") {
+        headers["Access-Control-Allow-Headers"] = "Content-Type, X-Session-ID, Cache-Control";
+      }
+      return new Response(null, { status: 204, headers });
     }
 
     if (url.pathname === "/api/admin/trigger-report" && request.method === "POST") {
@@ -75,43 +80,8 @@ export default {
       return handleUpload(request);
     }
 
-    if (url.pathname === "/api/telemetry" && request.method === "POST") {
-      try {
-        const body: unknown = await request.json();
-        if (!body || typeof body !== "object") {
-          return new Response("Invalid telemetry payload", { status: 400 });
-        }
-
-        const metrics = body as Record<string, unknown>;
-        env.TELEMETRY.writeDataPoint({
-          blobs: [
-            String(metrics.bufferbloatGrade ?? "unknown"),
-            String(metrics.colo ?? "unknown"),
-            String(metrics.asn ?? "unknown"),
-          ],
-          doubles: [
-            Number(metrics.downloadMbps) || 0,
-            Number(metrics.uploadMbps) || 0,
-            Number(metrics.idlePingMs) || 0,
-            Number(metrics.jitterMs) || 0,
-            Number(metrics.loadedPingMs) || 0,
-          ],
-          indexes: [String(metrics.colo ?? "unknown")],
-        });
-      } catch (error) {
-        console.warn(
-          JSON.stringify({
-            event: "telemetry.invalid_payload",
-            error: error instanceof Error ? error.message : String(error),
-          }),
-        );
-        return new Response("Invalid telemetry payload", { status: 400 });
-      }
-
-      return new Response(null, {
-        status: 202,
-        headers: { ...getCorsHeaders(request), "Content-Length": "0" },
-      });
+    if ((url.pathname === "/api/telemetry" || url.pathname === "/telemetry") && request.method === "POST") {
+      return handleTelemetry(request, env);
     }
 
     return env.ASSETS.fetch(request);

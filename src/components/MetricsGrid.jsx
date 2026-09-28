@@ -33,7 +33,7 @@ export default function MetricsGrid({ metrics }) {
             <SafeIcon icon={icon} />
             <span>{label}</span>
           </div>
-          <div className="metric-value">
+          <div className="metric-value text-lg sm:text-xl md:text-2xl break-words">
             {value} <small>{unit}</small>
           </div>
         </div>

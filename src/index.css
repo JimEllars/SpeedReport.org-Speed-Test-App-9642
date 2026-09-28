@@ -15,7 +15,7 @@
   --card-bg: rgba(8, 14, 24, .42);
   --card-border: #202d40;
   --accent-color: #2563eb;
-  --text-muted: #8794a8;
+  --text-muted: #94a3b8;
 }
 
 [data-theme="light"] {
@@ -24,7 +24,7 @@
   --card-bg: #FFFFFF;
   --card-border: #E2E8F0;
   --accent-color: #2563EB;
-  --text-muted: #64748B;
+  --text-muted: #94a3b8;
 }
 
 html {
