@@ -196,7 +196,7 @@ export function printReport(report) {
       rows: [
         ['Download', `${report.metrics.download} Mbps`],
         ['Upload', `${report.metrics.upload} Mbps`],
-        ['Idle latency', `${report.metrics.ping} ms`],
+        ['Latency', `${report.metrics.ping} ms`],
         ['Jitter', `${report.metrics.jitter} ms`],
         ['Loaded latency', `${report.metrics.loadedPing} ms`],
         ['Loaded jitter', `${report.metrics.loadedJitter} ms`],

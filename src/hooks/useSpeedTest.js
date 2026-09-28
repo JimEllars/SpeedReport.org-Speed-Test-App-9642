@@ -36,7 +36,7 @@ export function useSpeedTest(onComplete) {
   const [error, setError] = useState('');
 
   const updateLive = useCallback((key, value, ping) => {
-    setMetrics((current) => ({ ...current, [key]: value }));
+    setMetrics((current) => { const updated = { ...current, [key]: value }; if (ping !== undefined && ping !== null) { updated.loadedPing = ping; } return updated; });
     setSamples((current) => [...current.slice(-24), { value, ping }]);
   }, []);
 

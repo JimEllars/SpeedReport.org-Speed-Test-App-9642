@@ -96,7 +96,7 @@ export async function downloadReport(report) {
   line('Download throughput', `${report.metrics.download} Mbps`, 475);
   line('Upload throughput', `${report.metrics.upload} Mbps`, 453);
   line(
-    'Idle latency / Jitter',
+    'Latency / Jitter',
     `${report.metrics.ping} ms / ${report.metrics.jitter} ms`,
     431
   );

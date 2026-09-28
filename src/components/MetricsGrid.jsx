@@ -14,7 +14,7 @@ export default function MetricsGrid({ metrics }) {
   const items = [
     ['Download', metrics.download.toFixed(1), 'Mbps', FiDownload],
     ['Upload', metrics.upload.toFixed(1), 'Mbps', FiUpload],
-    ['Idle latency', metrics.ping.toFixed(1), 'ms', FiClock],
+    ['Latency', (metrics.loadedPing || metrics.ping).toFixed(1), 'ms', FiClock],
     ['Jitter', metrics.jitter.toFixed(1), 'ms variance', FiActivity],
     [
       'Bufferbloat',
@@ -26,9 +26,9 @@ export default function MetricsGrid({ metrics }) {
   ];
 
   return (
-    <section className="metrics-grid">
+    <section className="metrics-grid grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 w-full max-w-full mt-6">
       {items.map(([label, value, unit, icon]) => (
-        <div className="metric-card p-4 sm:p-6" key={label}>
+        <div className="metric-card p-3 sm:p-4 text-center rounded-xl bg-slate-900/60 border border-slate-800" key={label}>
           <div className="metric-top">
             <SafeIcon icon={icon} />
             <span>{label}</span>
