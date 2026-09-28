@@ -124,7 +124,7 @@ export function printReport(report) {
       letter-spacing: .12em;
       text-transform: uppercase;
     }
-    .muted { color: #64748b; font-size: 12px; }
+    .muted { color: #94a3b8; font-size: 12px; }
     .certificate {
       color: #2563eb;
       font-family: monospace;
@@ -148,7 +148,7 @@ export function printReport(report) {
       margin-top: 42px;
       padding-top: 14px;
       border-top: 1px solid #cbd5e1;
-      color: #64748b;
+      color: #94a3b8;
       font-size: 11px;
     }
     @media print {

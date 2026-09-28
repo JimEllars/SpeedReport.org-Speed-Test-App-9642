@@ -96,12 +96,13 @@ export async function measurePing(samples = 10, signal) {
   }
 
   const average = validReadings.reduce((sum, value) => sum + value, 0) / validReadings.length;
-  const variance = validReadings.reduce(
-    (sum, value) => sum + ((value - average) ** 2),
-    0
-  ) / validReadings.length;
 
-  const jitter = Math.sqrt(variance);
+  // RFC 3550 Jitter calculation: Ji = Ji-1 + (|D(i-1, i)| - Ji-1) / 16
+  let jitter = 0;
+  for (let i = 1; i < validReadings.length; i++) {
+    const diff = Math.abs(validReadings[i] - validReadings[i - 1]);
+    jitter = jitter + (diff - jitter) / 16;
+  }
 
   return {
     ping: round(average),
@@ -214,6 +215,13 @@ async function consumeDownload(bytes, calculator, signal) {
       calculator.addBytes(value.byteLength);
     }
   } finally {
+    try {
+      if (signal && signal.aborted) {
+        await reader.cancel();
+      }
+    } catch (e) {
+      // Ignore cancel error
+    }
     reader.releaseLock();
   }
 }
@@ -331,6 +339,10 @@ function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
     const xhr = new XMLHttpRequest();
 
     if (phaseSignal) {
+      if (phaseSignal.aborted) {
+        reject(new DOMException('The diagnostic was cancelled.', 'AbortError'));
+        return;
+      }
       phaseSignal.addEventListener('abort', () => {
         xhr.abort();
         reject(new DOMException('The diagnostic was cancelled.', 'AbortError'));
