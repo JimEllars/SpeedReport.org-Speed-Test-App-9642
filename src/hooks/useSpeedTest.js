@@ -41,9 +41,13 @@ export function useSpeedTest(onComplete) {
   }, []);
 
   const cancel = useCallback(() => {
-    controllerRef.current?.abort();
-    controllerRef.current = null;
+    if (controllerRef.current) {
+      controllerRef.current.abort();
+      controllerRef.current = null;
+    }
     setState(STATES.IDLE);
+    setMetrics(initialMetrics);
+    setSamples([]);
     setError('');
   }, []);
 
@@ -136,6 +140,8 @@ export function useSpeedTest(onComplete) {
     } catch (reason) {
       if (reason.name === 'AbortError') {
         setState(STATES.IDLE);
+        setMetrics(initialMetrics);
+        setSamples([]);
         return;
       }
 

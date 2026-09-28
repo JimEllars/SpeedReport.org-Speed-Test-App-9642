@@ -1,6 +1,6 @@
 import { handleDownload } from "./download";
 import { runExecutiveReportCron } from "./executiveReporter";
-import { getCorsHeaders, json, telemetryHeaders } from "./http";
+import { getCorsHeaders, json, telemetryHeaders, errorJson } from "./http";
 import { handleMeta } from "./meta";
 import { handleUpload } from "./upload";
 import { handleTelemetry } from "./telemetry";
@@ -41,11 +41,11 @@ export default {
     if (url.pathname === "/api/admin/trigger-report" && request.method === "POST") {
       if (!env.ADMIN_SECRET) {
         console.error("ADMIN_SECRET is not configured; rejecting report trigger.");
-        return new Response("Administrative reporting is unavailable", { status: 503 });
+        return errorJson("Administrative reporting is unavailable", "admin_unavailable", 503, request);
       }
 
       if (!isAuthorized(request, env.ADMIN_SECRET)) {
-        return new Response("Unauthorized", { status: 401 });
+        return errorJson("Unauthorized", "unauthorized", 401, request);
       }
 
       // Release workflow: keep manual reports off the response path so admin calls remain reliable.

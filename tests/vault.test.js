@@ -8,11 +8,11 @@ describe('useLocalVault Hook', () => {
     localStorage.clear();
   });
 
-  it('keeps pinned items when total reports exceed 50', () => {
+  it('keeps pinned items when total reports exceed 100', () => {
     const { result } = renderHook(() => useLocalVault());
 
-    // Save 50 unpinned items
-    for (let i = 1; i <= 50; i++) {
+    // Save 100 unpinned items (MAX_HISTORY is 100)
+    for (let i = 1; i <= 100; i++) {
       act(() => {
         result.current.save({
           id: `id-${i}`,
@@ -27,16 +27,16 @@ describe('useLocalVault Hook', () => {
       result.current.togglePin('id-1');
     });
 
-    // Save 1 more item (total would be 51)
+    // Save 1 more item (total would be 101)
     act(() => {
       result.current.save({
-        id: `id-51`,
+        id: `id-101`,
         timestamp: new Date(2023, 1, 1).toISOString(),
         pinned: false
       });
     });
 
-    expect(result.current.history.length).toBe(50);
+    expect(result.current.history.length).toBe(100);
     const hasPinnedItem = result.current.history.some(item => item.id === 'id-1' && item.pinned);
     expect(hasPinnedItem).toBe(true);
 

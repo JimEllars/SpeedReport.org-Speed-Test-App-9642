@@ -1,4 +1,3 @@
-
 import { motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import * as FiIcons from 'react-icons/fi';
@@ -17,10 +16,12 @@ function getGaugeMaxScale(mbps) {
 }
 
 function formatSpeed(value) {
+  if (Number.isNaN(value) || value === null) {
+    return '0.0 Mbps';
+  }
   if (value >= 1000) {
     return `${(value / 1000).toFixed(2)} Gbps`;
   }
-
   return `${value.toFixed(1)} Mbps`;
 }
 
@@ -32,7 +33,7 @@ export default function SpeedGauge({
   onCancel
 }) {
   const active = ![STATES.IDLE, STATES.COMPLETE, STATES.COMPLETED_PARTIAL, STATES.ERROR].includes(state);
-  const targetValue = state === STATES.UPLOAD ? metrics.upload : metrics.download;
+  const targetValue = (state === STATES.UPLOAD ? metrics.upload : metrics.download) || 0;
 
   const [displayValue, setDisplayValue] = useState(targetValue);
   const displayValueRef = useRef(displayValue);
@@ -76,7 +77,7 @@ export default function SpeedGauge({
     };
   }, [targetValue, active]);
 
-  const value = displayValue;
+  const value = Number.isNaN(displayValue) ? 0 : displayValue;
   // Calculate percentage dynamically for dynamic tiering
   const maxScaleMbps = getGaugeMaxScale(value);
   const percent = Math.min((value / maxScaleMbps) * 100, 100);
@@ -84,45 +85,50 @@ export default function SpeedGauge({
 
   const speedPoints = samples.length
     ? samples
-      .map((sample, index) => (
-        `${(index / Math.max(samples.length - 1, 1)) * 280},${55 - Math.min((sample.value !== undefined ? sample.value : sample) / 20, 48)}`
-      ))
+      .map((sample, index) => {
+        const sampleVal = sample.value !== undefined ? sample.value : sample;
+        const validVal = Number.isNaN(sampleVal) ? 0 : sampleVal;
+        return `${(index / Math.max(samples.length - 1, 1)) * 280},${55 - Math.min(validVal / 20, 48)}`;
+      })
       .join(' ')
     : '0,54 280,54';
 
   const pingPoints = samples.length && samples.some(s => s.ping !== undefined)
     ? samples
-      .map((sample, index) => (
-        `${(index / Math.max(samples.length - 1, 1)) * 280},${55 - Math.min((sample.ping || 0) / 10, 48)}`
-      ))
+      .map((sample, index) => {
+        const pingVal = sample.ping || 0;
+        const validPing = Number.isNaN(pingVal) ? 0 : pingVal;
+        return `${(index / Math.max(samples.length - 1, 1)) * 280},${55 - Math.min(validPing / 10, 48)}`;
+      })
       .join(' ')
     : '';
 
   return (
     <section className="gauge-card">
       <div className="status-line" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <span className={active ? 'pulse-dot active' : 'pulse-dot'} />
+        <div aria-live="polite">
+          <span className={active ? 'pulse-dot active' : 'pulse-dot'} aria-hidden="true" />
           {PHASE_LABELS[state]}
         </div>
-        <div style={{ fontSize: '10px', color: '#68778d' }}>
+        <div style={{ fontSize: '10px', color: '#68778d' }} aria-hidden="true">
           Scale: 0 &ndash; {maxScaleMbps >= 1000 ? maxScaleMbps / 1000 + ' Gbps' : maxScaleMbps + ' Mbps'}
         </div>
       </div>
 
       <div className="gauge w-full max-w-full flex flex-col items-center justify-center overflow-hidden" aria-live="polite" role="status" aria-valuenow={value}>
-        <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet" className="w-full h-auto max-w-[280px] sm:max-w-[340px] md:max-w-[380px] mx-auto overflow-visible" aria-label={`${value} megabits per second`}>
-          <path className="gauge-track" d="M40 200 A160 160 0 0 1 360 200" />
+        <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet" className="w-full h-auto max-w-[280px] sm:max-w-[340px] md:max-w-[380px] mx-auto overflow-visible" aria-label={`${value.toFixed(1)} megabits per second`}>
+          <path className="gauge-track" d="M40 200 A160 160 0 0 1 360 200" aria-hidden="true" />
           <motion.path
             className="gauge-progress"
             d="M40 200 A160 160 0 0 1 360 200"
             initial={{ pathLength: 0 }}
-            animate={{ pathLength: percent / 100 }}
+            animate={{ pathLength: Number.isNaN(percent) ? 0 : percent / 100 }}
             transition={{ type: 'tween', ease: 'linear', duration: 0.05 }}
+            aria-hidden="true"
           />
         </svg>
 
-        <div className="gauge-value">
+        <div className="gauge-value" aria-hidden="true">
           <strong>{value.toFixed(1)}</strong>
           <span>{formatSpeed(value).split(' ').slice(1).join(' ') || 'Mbps'}</span>
           <small>{state === STATES.UPLOAD ? 'UPLOAD' : 'DOWNLOAD'}</small>
@@ -133,7 +139,8 @@ export default function SpeedGauge({
         className="sparkline"
         viewBox="0 0 280 60"
         preserveAspectRatio="none"
-        aria-label="Live speed samples"
+        aria-label="Live speed samples graph"
+        role="img"
       >
         <polyline points={speedPoints} style={{ stroke: '#38d997' }} />
         {pingPoints && <polyline points={pingPoints} style={{ stroke: '#f5bc6e', opacity: 0.6 }} />}
@@ -144,6 +151,7 @@ export default function SpeedGauge({
           className="primary-button cancel-button"
           onClick={onCancel}
           type="button"
+          aria-label="Stop diagnostic"
         >
           <SafeIcon icon={FiStopCircle} />
           Stop diagnostic
@@ -153,13 +161,14 @@ export default function SpeedGauge({
           className="primary-button"
           onClick={onStart}
           type="button"
+          aria-label={state === STATES.IDLE ? 'Start speed test' : 'Run test again'}
         >
           <SafeIcon icon={state === STATES.IDLE ? FiPlay : FiRefreshCw} />
           {state === STATES.IDLE ? 'Start speed test' : 'Run test again'}
         </button>
       )}
 
-      <p className="test-note">
+      <p className="test-note" aria-hidden="true">
         Uses multiple edge streams and approximately 60 MB of test traffic.
       </p>
     </section>
