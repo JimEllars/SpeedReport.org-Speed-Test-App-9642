@@ -14,9 +14,6 @@ interface WorkerEnv {
   REPORT_RECIPIENT_BCC?: string;
 }
 
-interface ExecutionContext {
-  waitUntil(promise: Promise<unknown>): void;
-}
 
 function isAuthorized(request: Request, adminSecret?: string): boolean {
   return Boolean(adminSecret) && request.headers.get("Authorization") === `Bearer ${adminSecret}`;
@@ -78,7 +75,7 @@ export default {
     }
 
     if ((url.pathname === "/api/telemetry" || url.pathname === "/telemetry") && request.method === "POST") {
-      return handleTelemetry(request, env);
+      return handleTelemetry(request, env, ctx);
     }
 
     return env.ASSETS.fetch(request);

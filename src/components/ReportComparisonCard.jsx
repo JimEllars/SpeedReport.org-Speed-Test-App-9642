@@ -60,7 +60,7 @@ export default function ReportComparisonCard({ currentReport, previousReport }) 
   ];
 
   return (
-    <section className="panel comparison-panel">
+    <section className="panel comparison-panel" style={{ minWidth: 0 }}>
       <div className="panel-heading">
         <div>
           <span className="eyebrow">Historical analysis</span>
@@ -73,9 +73,9 @@ export default function ReportComparisonCard({ currentReport, previousReport }) 
         Current results compared with your previous saved diagnostic.
       </p>
 
-      <div className="comparison-reports">
-        <span>Current · {currentReport.id}</span>
-        <span>Previous · {previousReport.id}</span>
+      <div className="comparison-reports" style={{ overflowX: 'hidden' }}>
+        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>Current · {currentReport.id}</span>
+        <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>Previous · {previousReport.id}</span>
       </div>
 
       <div className="comparison-list">

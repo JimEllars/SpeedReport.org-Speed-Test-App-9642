@@ -14,16 +14,19 @@ export default function BusinessAuditCard({ metrics, complete }) {
   ];
 
   return (
-    <section className="panel audit-panel p-4 sm:p-6">
+    <section className="panel audit-panel p-4 sm:p-6" style={{ minWidth: 0 }}>
       <div className="panel-heading">
         <div><span className="eyebrow">Operational assessment</span><h2>Business readiness</h2></div>
         <div className={`grade ${complete ? 'ready' : ''}`}>{complete ? audit.grade : 'Pending'}</div>
       </div>
-      <div className="audit-list">
+      <div className="audit-list" style={{ overflowX: 'hidden' }}>
         {rows.map(([icon, title, detail]) => (
-          <div className="audit-row" key={title}>
+          <div className="audit-row" key={title} style={{ minWidth: 0 }}>
             <span className="audit-icon"><SafeIcon icon={icon} /></span>
-            <div><strong>{title}</strong><small>{detail}</small></div>
+            <div style={{ minWidth: 0 }}>
+              <strong style={{ display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{title}</strong>
+              <small style={{ display: 'block', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{detail}</small>
+            </div>
             {complete && <SafeIcon icon={FiCheckCircle} className="check" />}
           </div>
         ))}

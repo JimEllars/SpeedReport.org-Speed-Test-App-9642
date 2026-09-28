@@ -73,3 +73,89 @@ describe('telemetry', () => {
     setItemSpy.mockRestore();
   });
 });
+
+  it('attempts to flush queue with sendBeacon when available', async () => {
+    const queueData = [{ sessionId: 'SR-1', metrics: { ping: 10 } }];
+    localStorage.setItem('SPEEDREPORT_TELEMETRY_QUEUE', JSON.stringify(queueData));
+
+    const sendBeaconMock = vi.fn().mockReturnValue(true);
+    Object.defineProperty(global.navigator, 'sendBeacon', {
+      value: sendBeaconMock,
+      configurable: true,
+      writable: true
+    });
+    Object.defineProperty(global.navigator, 'onLine', {
+      value: true,
+      configurable: true,
+      writable: true
+    });
+
+    await telemetry.flushQueue();
+
+    expect(sendBeaconMock).toHaveBeenCalled();
+    const [url, blob] = sendBeaconMock.mock.calls[0];
+    expect(url).toBe('/api/telemetry');
+    expect(blob).toBeInstanceOf(Blob);
+
+    // After successful flush, queue should be empty
+    expect(JSON.parse(localStorage.getItem('SPEEDREPORT_TELEMETRY_QUEUE'))).toEqual([]);
+  });
+
+  it('falls back to fetch when sendBeacon fails', async () => {
+    const queueData = [{ sessionId: 'SR-1', metrics: { ping: 10 } }];
+    localStorage.setItem('SPEEDREPORT_TELEMETRY_QUEUE', JSON.stringify(queueData));
+
+    // sendBeacon is available but returns false
+    const sendBeaconMock = vi.fn().mockReturnValue(false);
+    Object.defineProperty(global.navigator, 'sendBeacon', {
+      value: sendBeaconMock,
+      configurable: true,
+      writable: true
+    });
+    Object.defineProperty(global.navigator, 'onLine', {
+      value: true,
+      configurable: true,
+      writable: true
+    });
+
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    global.fetch = fetchMock;
+
+    await telemetry.flushQueue();
+
+    expect(sendBeaconMock).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalled();
+    const fetchArgs = fetchMock.mock.calls[0];
+    expect(fetchArgs[0]).toBe('/api/telemetry');
+    expect(fetchArgs[1].keepalive).toBe(true);
+
+    expect(JSON.parse(localStorage.getItem('SPEEDREPORT_TELEMETRY_QUEUE'))).toEqual([]);
+  });
+
+  it('re-queues items when network fails', async () => {
+    const queueData = [{ sessionId: 'SR-1', metrics: { ping: 10 } }];
+    localStorage.setItem('SPEEDREPORT_TELEMETRY_QUEUE', JSON.stringify(queueData));
+
+    // sendBeacon fails
+    const sendBeaconMock = vi.fn().mockReturnValue(false);
+    Object.defineProperty(global.navigator, 'sendBeacon', {
+      value: sendBeaconMock,
+      configurable: true,
+      writable: true
+    });
+    Object.defineProperty(global.navigator, 'onLine', {
+      value: true,
+      configurable: true,
+      writable: true
+    });
+
+    // fetch fails
+    const fetchMock = vi.fn().mockRejectedValue(new Error('Network error'));
+    global.fetch = fetchMock;
+
+    await telemetry.flushQueue();
+
+    expect(fetchMock).toHaveBeenCalled();
+    // Items should be back in queue
+    expect(JSON.parse(localStorage.getItem('SPEEDREPORT_TELEMETRY_QUEUE'))).toEqual(queueData);
+  });
