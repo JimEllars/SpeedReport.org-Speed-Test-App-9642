@@ -32,9 +32,6 @@ export default {
 
     if (request.method === "OPTIONS") {
       const headers = getCorsHeaders(request);
-      if (url.pathname === "/api/telemetry" || url.pathname === "/telemetry") {
-        headers["Access-Control-Allow-Headers"] = "Content-Type, X-Session-ID, Cache-Control";
-      }
       return new Response(null, { status: 204, headers });
     }
 
