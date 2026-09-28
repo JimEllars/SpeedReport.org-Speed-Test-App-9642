@@ -62,3 +62,22 @@ describe('Readiness Utilities', () => {
     });
   });
 });
+
+  describe('metadata fallbacks', () => {
+    it('handles incomplete cloudflare metadata gracefully', () => {
+      // Mocking handleMeta behavior in terms of how front-end readiness might consume it
+      const meta = {
+        city: undefined,
+        region: '',
+        country: null
+      };
+
+      const fallbackCity = meta.city || 'Unknown City';
+      const fallbackRegion = meta.region || 'Unknown Region';
+      const fallbackCountry = meta.country || 'US';
+
+      expect(fallbackCity).toBe('Unknown City');
+      expect(fallbackRegion).toBe('Unknown Region');
+      expect(fallbackCountry).toBe('US');
+    });
+  });

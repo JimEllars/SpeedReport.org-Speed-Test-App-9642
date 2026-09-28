@@ -2,7 +2,7 @@ const QUEUE_KEY = 'SPEEDREPORT_TELEMETRY_QUEUE';
 const TELEMETRY_URL = '/api/telemetry';
 const MAX_QUEUE_SIZE = 50;
 
-function getQueue() {
+export function getQueue() {
   try {
     const data = localStorage.getItem(QUEUE_KEY);
     return data ? JSON.parse(data) : [];
@@ -11,9 +11,8 @@ function getQueue() {
   }
 }
 
-function saveQueue(queue) {
+export function saveQueue(queue) {
   try {
-    // Truncate queue to max size
     if (queue.length > MAX_QUEUE_SIZE) {
       queue = queue.slice(queue.length - MAX_QUEUE_SIZE);
     }
@@ -23,9 +22,10 @@ function saveQueue(queue) {
   }
 }
 
-async function flushQueue(retryCount = 0) {
+export async function flushQueue(retryCount = 0) {
   const queue = getQueue();
-  if (queue.length === 0 || !navigator.onLine) return;
+  // Using truthy check on navigator.onLine allows it to proceed if undefined (e.g. in test envs lacking it)
+  if (queue.length === 0 || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
 
   const toSend = [...queue];
   saveQueue([]); // Clear queue optimistically
@@ -34,9 +34,7 @@ async function flushQueue(retryCount = 0) {
     const blob = new Blob([JSON.stringify(toSend)], { type: 'application/json' });
 
     let success = false;
-
-    // Attempt sendBeacon first on unload or general use (limited by payload size, usually 64kb)
-    if (navigator.sendBeacon) {
+    if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
       success = navigator.sendBeacon(TELEMETRY_URL, blob);
     }
 
@@ -57,6 +55,7 @@ async function flushQueue(retryCount = 0) {
   } catch (e) {
     // If network fails, re-queue the items
     const currentQueue = getQueue();
+    // Prepend to maintain order or append, append is fine
     saveQueue([...currentQueue, ...toSend]);
 
     // Exponential backoff retry
@@ -69,12 +68,12 @@ async function flushQueue(retryCount = 0) {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => flushQueue());
-  // Use pagehide/visibilitychange for more reliable beaconing on unload
   window.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       flushQueue();
     }
   });
+  window.addEventListener('pagehide', () => flushQueue());
 }
 
 export function sendAnonymousTelemetry(report) {
@@ -91,7 +90,6 @@ export function sendAnonymousTelemetry(report) {
       userAgent = navigator.userAgent;
     }
 
-    // Required format: sessionId, timestamp, downloadMbps, uploadMbps, latencyMs, jitterMs, packetLoss, clientMeta
     const payload = {
       sessionId: report.id || 'unknown',
       timestamp: new Date().toISOString(),
@@ -113,7 +111,6 @@ export function sendAnonymousTelemetry(report) {
     queue.push(payload);
     saveQueue(queue);
 
-    // Make sure we don't await flushQueue so we don't block
     setTimeout(() => flushQueue(), 0);
   } catch (error) {
     // Ensure telemetry transmission never throws user-facing errors
