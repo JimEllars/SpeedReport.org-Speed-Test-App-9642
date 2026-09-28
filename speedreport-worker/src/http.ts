@@ -1,6 +1,7 @@
 export const defaultCorsHeaders = {
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Cache-Control, X-Session-ID',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Id',
   'Access-Control-Expose-Headers': 'Server-Timing, cf-ray, cf-colo, cf-proto, X-Received-Bytes, X-Duration-Ms',
   'Access-Control-Max-Age': '86400',
   'Timing-Allow-Origin': '*',
@@ -13,18 +14,7 @@ export const defaultCorsHeaders = {
 };
 
 export function getCorsHeaders(request?: Request): Record<string, string> {
-  let origin = '*';
-  if (request) {
-    const reqOrigin = request.headers.get('Origin');
-    if (reqOrigin) {
-      origin = reqOrigin;
-    }
-  }
-
-  return {
-    ...defaultCorsHeaders,
-    'Access-Control-Allow-Origin': origin,
-  };
+  return { ...defaultCorsHeaders };
 }
 
 interface RequestCfProperties {
@@ -72,12 +62,10 @@ export function errorJson(
 ): Response {
   return new Response(
     JSON.stringify({
-      success: false,
-      error: {
-        code,
-        message,
-        timestamp: new Date().toISOString()
-      }
+      error: true,
+      message,
+      code,
+      timestamp: new Date().toISOString()
     }),
     {
       status,

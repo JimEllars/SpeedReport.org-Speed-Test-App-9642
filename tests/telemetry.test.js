@@ -3,6 +3,7 @@ import * as telemetry from '../src/utils/telemetry';
 
 describe('telemetry', () => {
   beforeEach(() => {
+    localStorage.clear();
     sessionStorage.clear();
     vi.restoreAllMocks();
   });
@@ -36,17 +37,16 @@ describe('telemetry', () => {
     expect(queue.length).toBeGreaterThan(0);
     const payload = queue[0];
 
-    // Validate schema
+    // Validate schema (new format)
     expect(payload.sessionId).toBe('SR-1234');
-    expect(payload.metrics.downloadMbps).toBe(100);
-    expect(payload.metrics.uploadMbps).toBe(50);
-    expect(payload.metrics.pingMs).toBe(10);
-    expect(payload.metrics.jitterMs).toBe(2);
-    expect(payload.metrics.loadedPingMs).toBe(20);
-    expect(payload.metrics.bufferbloatGrade).toBe('A');
-    expect(payload.edge.colo).toBe('SFO');
-    expect(payload.edge.asn).toBe('AS1234');
-    expect(payload.client.userAgent).toBeDefined();
+    expect(payload.downloadMbps).toBe(100);
+    expect(payload.uploadMbps).toBe(50);
+    expect(payload.latencyMs).toBe(10);
+    expect(payload.jitterMs).toBe(2);
+    expect(payload.clientMeta.bufferbloatGrade).toBe('A');
+    expect(payload.clientMeta.colocation).toBe('SFO');
+    expect(payload.clientMeta.isp).toBe('AS1234');
+    expect(payload.clientMeta.userAgent).toBeDefined();
 
     setItemSpy.mockRestore();
   });

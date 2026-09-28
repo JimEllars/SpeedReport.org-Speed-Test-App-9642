@@ -47,9 +47,10 @@ export default function SpeedGauge({
     }
 
     let lastTime = performance.now();
+    const alpha = 0.15; // Exponential Moving Average smoothing factor
 
     const animate = (time) => {
-      const dt = time - lastTime;
+      // dt unused in EMA but we track time for framerate consistency
       lastTime = time;
 
       const current = displayValueRef.current;
@@ -59,9 +60,8 @@ export default function SpeedGauge({
         displayValueRef.current = targetValue;
         setDisplayValue(targetValue);
       } else {
-        // Linear smooth factor
-        const lerpFactor = Math.min(dt / 150, 1);
-        const next = current + diff * lerpFactor;
+        // Exponential moving average interpolation
+        const next = current + (targetValue - current) * alpha;
         displayValueRef.current = next;
         setDisplayValue(next);
         animationRef.current = requestAnimationFrame(animate);
@@ -106,7 +106,7 @@ export default function SpeedGauge({
   return (
     <section className="gauge-card">
       <div className="status-line" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div aria-live="polite">
+        <div aria-live="polite" role="status">
           <span className={active ? 'pulse-dot active' : 'pulse-dot'} aria-hidden="true" />
           {PHASE_LABELS[state]}
         </div>
@@ -115,7 +115,7 @@ export default function SpeedGauge({
         </div>
       </div>
 
-      <div className="gauge w-full max-w-full flex flex-col items-center justify-center overflow-hidden" aria-live="polite" role="status" aria-valuenow={value}>
+      <div className="gauge w-full max-w-full flex flex-col items-center justify-center overflow-hidden" aria-live="polite" role="meter" aria-valuenow={value} aria-valuemin="0" aria-valuemax={maxScaleMbps}>
         <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet" className="w-full h-auto max-w-[280px] sm:max-w-[340px] md:max-w-[380px] mx-auto overflow-visible" aria-label={`${value.toFixed(1)} megabits per second`}>
           <path className="gauge-track" d="M40 200 A160 160 0 0 1 360 200" aria-hidden="true" />
           <motion.path

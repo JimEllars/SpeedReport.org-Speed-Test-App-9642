@@ -1,10 +1,10 @@
-const QUEUE_KEY = 'sr_telemetry_queue';
+const QUEUE_KEY = 'SPEEDREPORT_TELEMETRY_QUEUE';
 const TELEMETRY_URL = '/api/telemetry';
 const MAX_QUEUE_SIZE = 50;
 
 function getQueue() {
   try {
-    const data = sessionStorage.getItem(QUEUE_KEY);
+    const data = localStorage.getItem(QUEUE_KEY);
     return data ? JSON.parse(data) : [];
   } catch {
     return [];
@@ -17,7 +17,7 @@ function saveQueue(queue) {
     if (queue.length > MAX_QUEUE_SIZE) {
       queue = queue.slice(queue.length - MAX_QUEUE_SIZE);
     }
-    sessionStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
   } catch {
     // Ignore storage errors
   }
@@ -91,34 +91,21 @@ export function sendAnonymousTelemetry(report) {
       userAgent = navigator.userAgent;
     }
 
+    // Required format: sessionId, timestamp, downloadMbps, uploadMbps, latencyMs, jitterMs, packetLoss, clientMeta
     const payload = {
       sessionId: report.id || 'unknown',
-      clientTimestamp: new Date().toISOString(),
-      metrics: {
-        latencyMs: report.metrics.ping || 0,
-        pingMs: report.metrics.ping || 0,
-        jitterMs: report.metrics.jitter || 0,
-        downloadMbps: report.metrics.download || 0,
-        uploadMbps: report.metrics.upload || 0,
-        loadedPingMs: report.metrics.loadedPing || 0, // Legacy fallback mapping support
-        idlePingMs: report.metrics.ping || 0,
-        packetLossPct: report.metrics.loss || 0,
-        bufferbloatGrade: report.metrics.bufferbloat || '—',
-      },
-      edge: {
-        colo: report.meta?.colo,
-        asn: report.meta?.asn,
-        country: report.meta?.country
-      },
-      client: {
-        userAgent,
-        screen: screenResolution
-      },
-      clientMetadata: {
+      timestamp: new Date().toISOString(),
+      downloadMbps: report.metrics.download || 0,
+      uploadMbps: report.metrics.upload || 0,
+      latencyMs: report.metrics.ping || 0,
+      jitterMs: report.metrics.jitter || 0,
+      packetLoss: report.metrics.loss || 0,
+      clientMeta: {
         userAgent,
         colocation: report.meta?.colo || 'unknown',
         isp: report.meta?.asn || 'unknown',
-        screen: screenResolution
+        screen: screenResolution,
+        bufferbloatGrade: report.metrics.bufferbloat || '—'
       }
     };
 
