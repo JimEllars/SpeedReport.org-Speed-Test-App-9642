@@ -11,6 +11,7 @@ import ReportCard from './components/ReportCard';
 import ReportShareCard from './components/ReportShareCard';
 import ReportComparisonCard from './components/ReportComparisonCard';
 import DiagnosticsSummary from './components/DiagnosticsSummary';
+import FiberLeadCard from './components/FiberLeadCard';
 import { useLocalVault } from './hooks/useLocalVault';
 import { useSpeedTest } from './hooks/useSpeedTest';
 import { readReportFromUrl } from './utils/reportShareLinks';
@@ -95,7 +96,7 @@ useEffect(() => {
   const previousReport = history.find((item) => item.id !== report?.id);
 
   return (
-    <div className="app-shell min-h-screen w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-x-hidden">
+    <div className="app-shell min-h-screen w-full max-w-7xl max-w-full mx-auto px-3 sm:px-6 lg:px-8 overflow-x-hidden">
       <Header />
 
       <main>
@@ -142,8 +143,9 @@ useEffect(() => {
           previousReport={previousReport}
         />
         <DiagnosticsSummary report={report} />
+        <FiberLeadCard report={report} />
 
-        <div className="lower-grid">
+        <div className="lower-grid flex flex-col gap-4 sm:gap-6 mt-4 sm:mt-6">
           <BusinessAuditCard
             metrics={displayedMetrics}
             complete={complete || Boolean(report)}

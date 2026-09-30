@@ -32,22 +32,28 @@ export default function ReportShareCard({ report, isShared }) {
   const shareReport = async () => {
     setError('');
 
-    if (!navigator.share) {
-      await copyLink();
-      return;
-    }
+    const shareData = {
+      title: 'SpeedReport.org Network Test',
+      text: `My internet speed is ${report.metrics.download.toFixed(1)} Mbps down / ${report.metrics.upload.toFixed(1)} Mbps up with ${(report.metrics.loadedPing || report.metrics.ping).toFixed(1)}ms latency on SpeedReport.org.`,
+      url: window.location.href,
+    };
 
-    try {
-      await navigator.share({
-        title: `SpeedReport ${report.id}`,
-        text: 'View this verified network performance report.',
-        url: shareUrl
-      });
-    } catch (reason) {
-      if (reason?.name !== 'AbortError') {
-        setError('The report could not be shared from this browser.');
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (err) {
+        if (err?.name !== 'AbortError') {
+          console.error('Share failed:', err);
+          setError('The report could not be shared from this browser.');
+        }
       }
     }
+
+    // Fallback to clipboard
+    await navigator.clipboard.writeText(shareData.text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const returnToLocalReport = () => {
