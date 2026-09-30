@@ -32,7 +32,7 @@ export default function ISPDetailsCard({ meta, metrics }) {
         <SafeIcon icon={FiServer} />
       </div>
 
-      <dl className="detail-list">
+      <div className="w-full overflow-x-auto"><dl className="detail-list min-w-[280px]">
         <div>
           <dt>Provider</dt>
           <dd>{meta?.isp || 'Detected when test starts'}</dd>
@@ -70,7 +70,7 @@ export default function ISPDetailsCard({ meta, metrics }) {
             </dd>
           </div>
         )}
-      </dl>
+      </dl></div>
     </section>
   );
 }

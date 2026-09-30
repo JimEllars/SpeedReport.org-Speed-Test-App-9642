@@ -78,7 +78,7 @@ export default function ReportComparisonCard({ currentReport, previousReport }) 
         <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>Previous · {previousReport.id}</span>
       </div>
 
-      <div className="comparison-list">
+      <div className="w-full overflow-x-auto"><div className="comparison-list min-w-[280px]">
         {rows.map((row) => (
           <div className="comparison-row" key={row.label}>
             <span>{row.label}</span>
@@ -86,7 +86,7 @@ export default function ReportComparisonCard({ currentReport, previousReport }) 
             <Delta value={row.delta} inverse={row.inverse} />
           </div>
         ))}
-      </div>
+      </div></div>
 
       <p className="comparison-footnote">
         For latency, jitter, and packet loss, a negative change indicates improvement.
