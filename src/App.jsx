@@ -95,7 +95,7 @@ useEffect(() => {
   const previousReport = history.find((item) => item.id !== report?.id);
 
   return (
-    <div className="app-shell min-h-screen w-full max-w-full overflow-x-hidden bg-slate-950 text-white px-4 sm:px-6 lg:px-8">
+    <div className="app-shell min-h-screen w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-x-hidden">
       <Header />
 
       <main>

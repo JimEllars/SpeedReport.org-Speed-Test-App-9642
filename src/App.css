@@ -26,6 +26,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   border-bottom: 1px solid #202938;
 }
 
@@ -78,6 +79,7 @@ button {
 
 .trust {
   gap: 24px;
+  flex-wrap: wrap;
   color: #8290a5;
   font-size: 12px;
 }
@@ -341,6 +343,7 @@ main {
 
 .panel-heading {
   justify-content: space-between;
+  flex-wrap: wrap;
 }
 
 .panel-heading h2 {
@@ -735,6 +738,7 @@ footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 20px;
   min-height: 88px;
   color: #536075;
