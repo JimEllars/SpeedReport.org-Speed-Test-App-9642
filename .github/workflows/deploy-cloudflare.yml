@@ -40,6 +40,7 @@ jobs:
       - name: Validate / Deploy Worker
         run: |
           cd speedreport-worker
+          rm -rf ../.wrangler .wrangler
           if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
             echo "No Cloudflare API token detected. Executing dry-run verification."
             npx wrangler deploy --dry-run
