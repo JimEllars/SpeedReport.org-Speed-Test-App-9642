@@ -57,6 +57,27 @@ export function useSpeedTest(onComplete) {
     const controller = new AbortController();
     controllerRef.current = controller;
 
+    // Helper to create phase-specific abort signals that respect the main cancellation
+    const createPhaseSignal = (timeoutMs = 12000) => {
+      const phaseController = new AbortController();
+      const timeoutId = setTimeout(() => phaseController.abort(new Error('Phase timeout')), timeoutMs);
+
+      const onMainAbort = () => {
+        clearTimeout(timeoutId);
+        phaseController.abort(controller.signal.reason || new DOMException('Aborted', 'AbortError'));
+      };
+
+      controller.signal.addEventListener('abort', onMainAbort);
+
+      return {
+        signal: phaseController.signal,
+        cleanup: () => {
+          clearTimeout(timeoutId);
+          controller.signal.removeEventListener('abort', onMainAbort);
+        }
+      };
+    };
+
     setError('');
     setMeta(null);
     setMetrics(initialMetrics);
@@ -65,10 +86,20 @@ export function useSpeedTest(onComplete) {
     try {
       setState(STATES.PING);
 
-      const [network, idle] = await Promise.all([
-        fetchMeta(controller.signal),
-        measurePing(12, controller.signal)
-      ]);
+      let network = {};
+      let idle = { ping: 0, jitter: 0, loss: 0 };
+      const pingPhase = createPhaseSignal(12000);
+      try {
+        [network, idle] = await Promise.all([
+          fetchMeta(pingPhase.signal),
+          measurePing(12, pingPhase.signal)
+        ]);
+      } catch (err) {
+        if (err.name === 'AbortError' && controller.signal.aborted) throw err;
+        console.warn('Ping phase failed:', err);
+      } finally {
+        pingPhase.cleanup();
+      }
 
       const mergedNetwork = { ...network };
       if (idle.telemetry?.cfColo && !mergedNetwork.colo) {
@@ -86,18 +117,36 @@ export function useSpeedTest(onComplete) {
       setMetrics((current) => ({ ...current, ...idle }));
 
       setState(STATES.DOWNLOAD);
-      const dlRes = await measureDownload(
-        (value, ping) => updateLive('download', value, ping),
-        controller.signal
-      );
+      let dlRes = { bandwidth: 0, loadedPing: null };
+      const dlPhase = createPhaseSignal(12000);
+      try {
+        dlRes = await measureDownload(
+          (value, ping) => updateLive('download', value, ping),
+          dlPhase.signal
+        );
+      } catch (err) {
+        if (err.name === 'AbortError' && controller.signal.aborted) throw err;
+        console.warn('Download phase failed:', err);
+      } finally {
+        dlPhase.cleanup();
+      }
       setMetrics((current) => ({ ...current, download: dlRes.bandwidth }));
 
       setState(STATES.UPLOAD);
       setSamples([]); // Reset samples for upload
-      const ulRes = await measureUpload(
-        (value, ping) => updateLive('upload', value, ping),
-        controller.signal
-      );
+      let ulRes = { bandwidth: 0, loadedPing: null };
+      const ulPhase = createPhaseSignal(12000);
+      try {
+        ulRes = await measureUpload(
+          (value, ping) => updateLive('upload', value, ping),
+          ulPhase.signal
+        );
+      } catch (err) {
+        if (err.name === 'AbortError' && controller.signal.aborted) throw err;
+        console.warn('Upload phase failed:', err);
+      } finally {
+        ulPhase.cleanup();
+      }
       setMetrics((current) => ({ ...current, upload: ulRes.bandwidth }));
 
       const pings = [dlRes.loadedPing, ulRes.loadedPing].filter((p) => p !== null);

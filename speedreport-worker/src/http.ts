@@ -1,7 +1,7 @@
 export const defaultCorsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Id, X-SpeedReport-Client, Cache-Control',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Session-Id, X-SpeedReport-Client, Cache-Control, x-test-run-id, x-timestamp',
   'Access-Control-Expose-Headers': 'Server-Timing, cf-ray, cf-colo, cf-proto, X-Received-Bytes, X-Duration-Ms',
   'Access-Control-Max-Age': '86400',
   'Timing-Allow-Origin': '*',

@@ -39,7 +39,11 @@ export function handleDownload(request: Request, url: URL): Response {
       ...telemetryHeaders(request),
       'Content-Type': 'application/octet-stream',
       'Content-Length': String(target),
-      'Content-Encoding': 'identity'
+      'Content-Encoding': 'identity',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Surrogate-Control': 'no-store'
     }
   });
 }

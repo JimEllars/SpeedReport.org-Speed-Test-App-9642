@@ -15,7 +15,7 @@ export async function downloadReport(report) {
   const readiness = getReadiness(report.metrics);
   const loadedDelta = Math.max(
     0,
-    report.metrics.loadedPing - report.metrics.ping
+    (report.metrics?.loadedPing || 0) - (report.metrics?.ping || 0)
   );
 
   page.drawRectangle({
@@ -93,21 +93,21 @@ export async function downloadReport(report) {
     color: blue
   });
 
-  line('Download throughput', `${report.metrics.download} Mbps`, 475);
-  line('Upload throughput', `${report.metrics.upload} Mbps`, 453);
+  line('Download throughput', `${report.metrics?.download || 0} Mbps`, 475);
+  line('Upload throughput', `${report.metrics?.upload || 0} Mbps`, 453);
   line(
     'Latency / Jitter',
-    `${report.metrics.ping} ms / ${report.metrics.jitter} ms`,
+    `${report.metrics?.ping || 0} ms / ${report.metrics?.jitter || 0} ms`,
     431
   );
   line(
     'Loaded latency / Jitter',
-    `${report.metrics.loadedPing} ms / ${report.metrics.loadedJitter} ms`,
+    `${report.metrics?.loadedPing || 0} ms / ${report.metrics?.loadedJitter || 0} ms`,
     409
   );
-  line('Loaded latency increase', `+${loadedDelta.toFixed(1)} ms`, 387);
-  line('Packet loss', `${report.metrics.loss}%`, 365);
-  line('Bufferbloat grade', report.metrics.bufferbloat, 343);
+  line('Loaded latency increase', `+${(loadedDelta || 0).toFixed(1)} ms`, 387);
+  line('Packet loss', `${report.metrics?.loss || 0}%`, 365);
+  line('Bufferbloat grade', report.metrics?.bufferbloat || '—', 343);
 
   page.drawText('BUSINESS READINESS', {
     x: 42,
@@ -174,7 +174,7 @@ export async function downloadReport(report) {
 
 
   const shareUrl = createReportShareUrl(report);
-  const qrDataUrl = await QRCode.toDataURL(shareUrl, { width: 100, margin: 0 });
+  const qrDataUrl = await QRCode.toDataURL(shareUrl, { width: 100, margin: 0, scale: 2 });
   const qrImage = await pdf.embedPng(qrDataUrl);
 
   const qrDims = qrImage.scale(0.8);
