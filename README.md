@@ -42,8 +42,32 @@ npm --prefix speedreport-worker exec wrangler secret put ADMIN_SECRET
 npm --prefix speedreport-worker exec wrangler secret put RESEND_API_KEY
 ```
 
-For every release, run `npm run lint`, `npm test`, `npm run build`, and
-`npm run deploy:dry-run`. Push the feature branch, open a pull request, and
-have a maintainer merge it; production deployment follows the repository's
-Cloudflare workflow. After deployment, verify `https://speedreport.org/health`
-and run a full speed test from `https://speedreport.org/`.
+## GitHub-to-Cloudflare deployment
+
+`.github/workflows/deploy-cloudflare.yml` validates every pull request and
+deploys the `speedreport-edge-engine` Worker after a successful push to
+`main`. It builds the Vite application, then deploys the Worker and its
+generated `dist` assets together. Deployment is serialized so concurrent
+merges cannot overwrite one another.
+
+Before the first deployment, add these repository Actions secrets in
+**Settings > Secrets and variables > Actions**:
+
+- `CLOUDFLARE_ACCOUNT_ID`: `75c34bd25e04d106a9108737a3d3bcf1`
+- `CLOUDFLARE_API_TOKEN`: a Cloudflare API token scoped to this account with
+  Workers Scripts: Edit and Workers Routes: Edit permissions for the
+  `speedreport.org` zone.
+
+The deployment uses `--keep-vars`, so runtime secrets and dashboard-managed
+variables are preserved. Configure `ADMIN_SECRET` and `RESEND_API_KEY` in
+Cloudflare before enabling scheduled executive reports:
+
+```sh
+npm --prefix speedreport-worker exec wrangler secret put ADMIN_SECRET
+npm --prefix speedreport-worker exec wrangler secret put RESEND_API_KEY
+```
+
+For manual release validation, run `npm run lint`, `npm test`, `npm run build`,
+and `npm run deploy:dry-run`. After deployment, verify
+`https://speedreport.org/health` and run a full speed test from
+`https://speedreport.org/`.
