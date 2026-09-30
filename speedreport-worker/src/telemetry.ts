@@ -72,11 +72,13 @@ export async function handleTelemetry(request: Request, env: any, ctx: Execution
                 ],
                 indexes: [String(colocation)],
               });
+            } else {
+              console.log(JSON.stringify({ event: "telemetry.log", payload }));
             }
           }
         } catch (error) {
           // Guarantee worker does NOT throw 500 errors if KV bindings are absent or rate-limited; gracefully degrade to edge logging.
-          console.error("Telemetry write failed, gracefully degraded:", error);
+          console.error(JSON.stringify({ event: "telemetry.write_failed", error: error instanceof Error ? error.message : String(error), payloads }));
         }
       })()
     );

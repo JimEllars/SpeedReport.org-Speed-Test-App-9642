@@ -47,7 +47,7 @@ export default function SpeedGauge({
     }
 
     let lastTime = performance.now();
-    const alpha = 0.15; // Exponential Moving Average smoothing factor
+    const alpha = 0.2; // Exponential Moving Average smoothing factor
 
     const animate = (time) => {
       // dt unused in EMA but we track time for framerate consistency
@@ -110,7 +110,7 @@ export default function SpeedGauge({
           <span className={active ? 'pulse-dot active' : 'pulse-dot'} aria-hidden="true" />
           {PHASE_LABELS[state]}
         </div>
-        <div style={{ fontSize: '10px', color: '#68778d' }} aria-hidden="true">
+        <div style={{ fontSize: '10px', color: '#718096' }} aria-hidden="true">
           Scale: 0 &ndash; {maxScaleMbps >= 1000 ? maxScaleMbps / 1000 + ' Gbps' : maxScaleMbps + ' Mbps'}
         </div>
       </div>

@@ -83,9 +83,10 @@ export default function TestHistoryVault({ history, onClear, onSelect, onToggleP
       </div>
 
       {history.length === 0 ? (
-        <div className="empty-state">
-          <SafeIcon icon={FiArchive} />
-          <p>Your completed tests will appear here.</p>
+        <div className="empty-state" style={{ padding: '2rem', textAlign: 'center', color: '#718096' }}>
+          <SafeIcon icon={FiArchive} style={{ fontSize: '2rem', marginBottom: '1rem', opacity: 0.5 }} />
+          <p>No tests recorded yet.</p>
+          <p style={{ fontSize: '0.875rem', opacity: 0.8, marginTop: '0.5rem' }}>Run your first diagnostic to start tracking performance history.</p>
         </div>
       ) : (
         <>
