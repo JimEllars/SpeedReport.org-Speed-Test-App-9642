@@ -159,3 +159,31 @@ describe('telemetry', () => {
     // Items should be back in queue
     expect(JSON.parse(localStorage.getItem('SPEEDREPORT_TELEMETRY_QUEUE'))).toEqual(queueData);
   });
+
+  it('preserves items in queue on flush failure', async () => {
+    const queueData = [{ sessionId: 'SR-1', metrics: { ping: 10 } }];
+    localStorage.setItem('SPEEDREPORT_TELEMETRY_QUEUE', JSON.stringify(queueData));
+
+    // sendBeacon fails
+    const sendBeaconMock = vi.fn().mockReturnValue(false);
+    Object.defineProperty(global.navigator, 'sendBeacon', {
+      value: sendBeaconMock,
+      configurable: true,
+      writable: true
+    });
+    Object.defineProperty(global.navigator, 'onLine', {
+      value: true,
+      configurable: true,
+      writable: true
+    });
+
+    // fetch fails with 500
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    global.fetch = fetchMock;
+
+    await telemetry.flushQueue();
+
+    expect(fetchMock).toHaveBeenCalled();
+    // Items should be back in queue
+    expect(JSON.parse(localStorage.getItem('SPEEDREPORT_TELEMETRY_QUEUE'))).toEqual(queueData);
+  });

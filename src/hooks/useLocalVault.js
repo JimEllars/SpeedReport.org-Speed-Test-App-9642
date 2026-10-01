@@ -32,6 +32,44 @@ function readReports() {
   }
 }
 
+
+const safeSetStorage = (key, data, current) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+    return data;
+  } catch (error) {
+    if (error.name === 'QuotaExceededError' || error.code === 22) {
+      let currentData = data;
+      // We will loop to keep pruning until we succeed or have no unpinned left
+      while (true) {
+        const pinned = currentData.filter(i => i.pinned);
+        const unpinned = currentData.filter(i => !i.pinned);
+
+        if (unpinned.length === 0) {
+          // If no unpinned items left to prune and we still fail, return current (unchanged)
+          return current;
+        }
+
+        const numToPrune = Math.max(1, Math.ceil(unpinned.length * 0.15));
+        const prunedUnpinned = unpinned.slice(0, Math.max(0, unpinned.length - numToPrune));
+        const pruned = [...pinned, ...prunedUnpinned].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        try {
+          localStorage.setItem(key, JSON.stringify(pruned));
+          return pruned;
+        } catch (e) {
+          if (e.name === 'QuotaExceededError' || e.code === 22) {
+            currentData = pruned;
+            continue; // Keep pruning
+          }
+          return current;
+        }
+      }
+    }
+    return current;
+  }
+};
+
 export function useLocalVault() {
   const [storageUsagePercent, setStorageUsagePercent] = useState(0);
   const [history, setHistory] = useState([]);
@@ -69,9 +107,9 @@ export function useLocalVault() {
 
         let next = [...pinned, ...nextUnpinned].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        setStorageUsagePercent(Math.round((next.length / MAX_HISTORY) * 100));
-        return next;
+        const finalData = safeSetStorage(STORAGE_KEY, next, currentHistory);
+        setStorageUsagePercent(Math.round((finalData.length / MAX_HISTORY) * 100));
+        return finalData;
       });
       return true;
     } catch (e) {
@@ -107,30 +145,9 @@ export function useLocalVault() {
          next = [...nextPinned, ...nextNonPinned.slice(0, maxUnpinned)].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
       }
 
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        setStorageUsagePercent(Math.round((next.length / MAX_HISTORY) * 100));
-        return next;
-      } catch (error) {
-        if (error.name === 'QuotaExceededError' || error.code === 22) {
-          const nextPinned = next.filter(i => i.pinned);
-          const nextNonPinned = next.filter(i => !i.pinned);
-          if (nextNonPinned.length > 0) {
-            const numToPrune = Math.max(1, Math.ceil(nextNonPinned.length * 0.15));
-            const prunedNonPinned = nextNonPinned.slice(0, Math.max(0, nextNonPinned.length - numToPrune));
-            const pruned = [...nextPinned, ...prunedNonPinned].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-            try {
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(pruned));
-              setStorageUsagePercent(Math.round((pruned.length / MAX_HISTORY) * 100));
-              return pruned;
-            } catch (e) {
-              return current;
-            }
-          }
-          return current;
-        }
-        return current;
-      }
+      const finalData = safeSetStorage(STORAGE_KEY, next, current);
+      setStorageUsagePercent(Math.round((finalData.length / MAX_HISTORY) * 100));
+      return finalData;
     });
   }, []);
 
@@ -142,12 +159,9 @@ export function useLocalVault() {
         }
         return item;
       });
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        return next;
-      } catch (error) {
-        return current;
-      }
+      const finalData = safeSetStorage(STORAGE_KEY, next, current);
+      setStorageUsagePercent(Math.round((finalData.length / MAX_HISTORY) * 100));
+      return finalData;
     });
   }, []);
 

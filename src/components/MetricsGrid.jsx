@@ -31,13 +31,13 @@ export default function MetricsGrid({ metrics }) {
 
   return (
     <section className="metrics-grid w-full max-w-full mt-6">
-      <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4" style={{ minHeight: '32px' }}>
         <h3 className="text-xl font-bold text-slate-100">Performance Metrics</h3>
         {status && (
           <span className={`px-2 py-1 rounded text-xs font-semibold uppercase tracking-wider ${
-            status === 'Optimal' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-            status === 'Degraded' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
-            'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+            status === 'Optimal' ? 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/50' :
+            status === 'Degraded' ? 'bg-amber-900/40 text-amber-300 border border-amber-500/50' :
+            'bg-rose-900/40 text-rose-300 border border-rose-500/50'
           }`}>
             {status}
           </span>
