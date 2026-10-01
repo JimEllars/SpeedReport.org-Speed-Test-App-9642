@@ -47,7 +47,10 @@ export default function SpeedGauge({
     }
 
     let lastTime = performance.now();
-    const alpha = 0.2; // Exponential Moving Average smoothing factor
+
+    const EMA_ALPHA = 0.2;
+    // For high-refresh-rate displays we can use a tighter tweening
+
 
     const animate = (time) => {
       // dt unused in EMA but we track time for framerate consistency
@@ -61,7 +64,13 @@ export default function SpeedGauge({
         setDisplayValue(targetValue);
       } else {
         // Exponential moving average interpolation
-        const next = current + (targetValue - current) * alpha;
+
+        // Use a time-based interpolation to eliminate jitter on 120Hz displays
+        const dt = time - lastTime;
+        const fpsRatio = Math.min(dt / (1000 / 60), 2); // Normalize against 60fps
+        const dynamicAlpha = Math.min(EMA_ALPHA * fpsRatio, 1);
+        const next = current + (targetValue - current) * dynamicAlpha;
+
         displayValueRef.current = next;
         setDisplayValue(next);
         animationRef.current = requestAnimationFrame(animate);

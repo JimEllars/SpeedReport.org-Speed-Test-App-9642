@@ -141,10 +141,12 @@ class ThroughputCalculator {
     this.started = performance.now();
     this.warmupTime = 2000; // 2.0s warmup
     this.windowSize = 200; // 200ms window
+    this.lastBytesTime = performance.now();
   }
 
   addBytes(bytes) {
     const now = performance.now();
+    if (bytes > 0) this.lastBytesTime = now;
     this.chunks.push({ bytes, time: now });
     this.totalBytesInWindow += bytes;
 
@@ -191,6 +193,10 @@ class ThroughputCalculator {
     // 90th percentile
     const idx = Math.floor(sorted.length * 0.90);
     return sorted[idx] || this.getLiveSpeedMbps();
+  }
+
+  checkStall() {
+    return (performance.now() - this.lastBytesTime) > 3500;
   }
 }
 
@@ -253,6 +259,12 @@ export async function measureDownload(onProgress = () => {}, signal) {
   }, 1000);
 
   let progressIntervalId = setInterval(() => {
+    if (calculator.checkStall()) {
+      import('../utils/telemetry.js').then(t => t.trackEvent('network_stall', { phase: 'DOWNLOAD' })).catch(() => {});
+      phaseController.abort(new Error('Network stall detected during download'));
+      return;
+    }
+
     if (performance.now() - started < 500) return; // drop warmup from UI
     const lastPing = pings.length > 0 ? pings[pings.length - 1] : undefined;
     onProgress(round(calculator.getLiveSpeedMbps()), lastPing);
@@ -396,6 +408,12 @@ export async function measureUpload(onProgress = () => {}, signal) {
   }, 1000);
 
   let progressIntervalId = setInterval(() => {
+    if (calculator.checkStall()) {
+      import('../utils/telemetry.js').then(t => t.trackEvent('network_stall', { phase: 'UPLOAD' })).catch(() => {});
+      phaseController.abort(new Error('Network stall detected during upload'));
+      return;
+    }
+
     if (performance.now() - started < 500) return;
     const lastPing = pings.length > 0 ? pings[pings.length - 1] : undefined;
     onProgress(round(calculator.getLiveSpeedMbps()), lastPing);

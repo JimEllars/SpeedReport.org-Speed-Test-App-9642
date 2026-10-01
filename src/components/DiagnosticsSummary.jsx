@@ -64,7 +64,7 @@ export default function DiagnosticsSummary({ report }) {
 
       <div className="diagnostic-grid">
         {rows.map((row) => (
-          <div className="diagnostic-item" key={row.label}>
+          <div className="diagnostic-item" style={{ minHeight: "44px", flexWrap: "wrap" }} key={row.label}>
             <div className="diagnostic-icon">
               <SafeIcon icon={row.icon} />
             </div>

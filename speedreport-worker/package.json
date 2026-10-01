@@ -10,9 +10,7 @@
     "types": "wrangler types --config wrangler.jsonc"
   },
   "devDependencies": {
+    "typescript": "^5.9.3",
     "wrangler": "^4.11.1"
-  },
-  "dependencies": {
-    "typescript": "^7.0.2"
   }
 }
