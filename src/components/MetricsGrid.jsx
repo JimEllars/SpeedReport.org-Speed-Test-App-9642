@@ -35,17 +35,17 @@ export default function MetricsGrid({ metrics }) {
         <h3 className="text-xl font-bold text-slate-100">Performance Metrics</h3>
         {status && (
           <span className={`px-2 py-1 rounded text-xs font-semibold uppercase tracking-wider ${
-            status === 'Optimal' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-            status === 'Degraded' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
-            'bg-red-500/20 text-red-400 border border-red-500/30'
+            status === 'Optimal' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+            status === 'Degraded' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+            'bg-rose-500/20 text-rose-400 border border-rose-500/30'
           }`}>
             {status}
           </span>
         )}
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+      <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 w-full">
         {items.map(([label, value, unit, icon]) => (
-          <div className="metric-card p-3 sm:p-4 text-center rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between" style={{ minHeight: '100px' }} key={label}>
+          <div className="metric-card p-2.5 sm:p-4 text-center rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between" style={{ minHeight: '100px' }} key={label}>
             <div className="metric-top flex items-center justify-center gap-2 mb-2 text-slate-400 text-sm font-medium">
               <SafeIcon icon={icon} />
               <span>{label}</span>

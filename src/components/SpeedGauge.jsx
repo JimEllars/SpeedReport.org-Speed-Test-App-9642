@@ -116,7 +116,7 @@ export default function SpeedGauge({
       </div>
 
       <div className="gauge w-full max-w-full flex flex-col items-center justify-center overflow-visible" style={{ minHeight: '260px' }} aria-live="polite" role="meter" aria-valuenow={value} aria-valuemin="0" aria-valuemax={maxScaleMbps}>
-        <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet" className="w-full h-auto max-w-[280px] sm:max-w-[340px] md:max-w-[380px] mx-auto overflow-visible" aria-label={`${value.toFixed(1)} megabits per second`}>
+        <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet" className="w-full h-auto max-w-[270px] md:max-w-[320px] mx-auto overflow-visible" aria-label={`${value.toFixed(1)} megabits per second`}>
           <path className="gauge-track" d="M40 200 A160 160 0 0 1 360 200" aria-hidden="true" />
           <motion.path
             className="gauge-progress"
@@ -129,7 +129,7 @@ export default function SpeedGauge({
         </svg>
 
         <div className="gauge-value" style={{ fontVariantNumeric: 'tabular-nums' }} aria-hidden="true">
-          <strong>{value.toFixed(1)}</strong>
+          <strong className="text-4xl md:text-6xl">{value.toFixed(1)}</strong>
           <span>{formatSpeed(value).split(' ').slice(1).join(' ') || 'Mbps'}</span>
           <small>{state === STATES.UPLOAD ? 'UPLOAD' : 'DOWNLOAD'}</small>
         </div>
@@ -148,7 +148,7 @@ export default function SpeedGauge({
 
       {active ? (
         <button
-          className="primary-button cancel-button"
+          className="primary-button cancel-button min-h-[48px] px-8 py-3.5 text-base font-bold rounded-xl active:scale-95 transition-transform mx-auto flex items-center justify-center gap-2"
           onClick={onCancel}
           type="button"
           aria-label="Stop diagnostic"
@@ -158,7 +158,7 @@ export default function SpeedGauge({
         </button>
       ) : (
         <button
-          className="primary-button"
+          className="primary-button min-h-[48px] px-8 py-3.5 text-base font-bold rounded-xl active:scale-95 transition-transform mx-auto flex items-center justify-center gap-2"
           onClick={onStart}
           type="button"
           aria-label={state === STATES.IDLE ? 'Start speed test' : 'Run test again'}
