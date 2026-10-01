@@ -115,10 +115,11 @@ export default function SpeedGauge({
         </div>
       </div>
 
-      <div className="gauge w-full max-w-full flex flex-col items-center justify-center overflow-visible" style={{ minHeight: '260px' }} aria-live="polite" role="meter" aria-valuenow={value} aria-valuemin="0" aria-valuemax={maxScaleMbps}>
+      <div className="gauge w-full max-w-full flex flex-col items-center justify-center overflow-visible" style={{ minHeight: '260px', transform: 'translateZ(0)' }} aria-live="polite" role="meter" aria-valuenow={value} aria-valuemin="0" aria-valuemax={maxScaleMbps}>
         <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet" className="w-full h-auto max-w-[270px] md:max-w-[320px] mx-auto overflow-visible" aria-label={`${value.toFixed(1)} megabits per second`}>
           <path className="gauge-track" d="M40 200 A160 160 0 0 1 360 200" aria-hidden="true" />
           <motion.path
+            style={{ transform: 'translateZ(0)' }}
             className="gauge-progress"
             d="M40 200 A160 160 0 0 1 360 200"
             initial={{ pathLength: 0 }}
@@ -128,7 +129,7 @@ export default function SpeedGauge({
           />
         </svg>
 
-        <div className="gauge-value" style={{ fontVariantNumeric: 'tabular-nums' }} aria-hidden="true">
+        <div className="gauge-value" style={{ fontVariantNumeric: 'tabular-nums', transform: 'translateZ(0)', minWidth: '180px', display: 'flex', flexDirection: 'column', alignItems: 'center' }} aria-hidden="true">
           <strong className="text-4xl md:text-6xl">{value.toFixed(1)}</strong>
           <span>{formatSpeed(value).split(' ').slice(1).join(' ') || 'Mbps'}</span>
           <small>{state === STATES.UPLOAD ? 'UPLOAD' : 'DOWNLOAD'}</small>
