@@ -5,9 +5,17 @@ const DEFAULT_BYTES = 25 * 1024 * 1024;
 const MAX_BYTES = 100 * 1024 * 1024;
 
 const STATIC_CHUNK = new Uint8Array(CHUNK_SIZE);
-crypto.getRandomValues(STATIC_CHUNK);
+let isChunkInitialized = false;
+
+function initializeChunk() {
+  if (!isChunkInitialized) {
+    crypto.getRandomValues(STATIC_CHUNK);
+    isChunkInitialized = true;
+  }
+}
 
 export function handleDownload(request: Request, url: URL): Response {
+  initializeChunk();
   const requested = Number(url.searchParams.get('bytes')) || DEFAULT_BYTES;
   const target = Math.min(Math.max(requested, CHUNK_SIZE), MAX_BYTES);
   let sent = 0;
