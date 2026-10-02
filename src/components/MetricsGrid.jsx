@@ -43,14 +43,14 @@ export default function MetricsGrid({ metrics }) {
           </span>
         )}
       </div>
-      <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 w-full">
+      <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 w-full">
         {items.map(([label, value, unit, icon]) => (
           <div className="metric-card p-2.5 sm:p-4 text-center rounded-xl bg-slate-900/60 border border-slate-800 flex flex-col justify-between" style={{ minHeight: '100px' }} key={label}>
             <div className="metric-top flex items-center justify-center gap-2 mb-2 text-slate-400 text-sm font-medium">
               <SafeIcon icon={icon} />
               <span>{label}</span>
             </div>
-            <div className="metric-value text-lg sm:text-xl md:text-2xl break-words font-semibold tabular-nums">
+            <div className="metric-value text-base xs:text-lg sm:text-xl md:text-2xl break-words font-semibold tabular-nums leading-tight tracking-tight">
               {value} <span className="text-sm font-normal text-slate-400 ml-1">{unit}</span>
             </div>
           </div>

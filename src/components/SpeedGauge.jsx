@@ -124,8 +124,8 @@ export default function SpeedGauge({
         </div>
       </div>
 
-      <div className="gauge w-full max-w-full flex flex-col items-center justify-center overflow-visible" style={{ minHeight: '260px', transform: 'translateZ(0)' }} aria-live="polite" role="meter" aria-valuenow={value} aria-valuemin="0" aria-valuemax={maxScaleMbps}>
-        <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet" className="w-full h-auto max-w-[270px] md:max-w-[320px] mx-auto overflow-visible" aria-label={`${value.toFixed(1)} megabits per second`}>
+      <div className="gauge relative w-full max-w-[280px] xs:max-w-[320px] sm:max-w-[380px] mx-auto aspect-square flex items-center justify-center overflow-visible" style={{ minHeight: '260px', transform: 'translateZ(0)' }} aria-live="polite" role="meter" aria-valuenow={value} aria-valuemin="0" aria-valuemax={maxScaleMbps}>
+        <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet" className="w-full h-auto max-w-full mx-auto overflow-visible transform select-none" aria-label={`${value.toFixed(1)} megabits per second`}>
           <path className="gauge-track" d="M40 200 A160 160 0 0 1 360 200" aria-hidden="true" />
           <motion.path
             style={{ transform: 'translateZ(0)' }}
@@ -138,10 +138,10 @@ export default function SpeedGauge({
           />
         </svg>
 
-        <div className="gauge-value" style={{ fontVariantNumeric: 'tabular-nums', transform: 'translateZ(0)', minWidth: '180px', display: 'flex', flexDirection: 'column', alignItems: 'center' }} aria-hidden="true">
-          <strong className="text-4xl md:text-6xl">{value.toFixed(1)}</strong>
-          <span>{formatSpeed(value).split(' ').slice(1).join(' ') || 'Mbps'}</span>
-          <small>{state === STATES.UPLOAD ? 'UPLOAD' : 'DOWNLOAD'}</small>
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none" style={{ fontVariantNumeric: 'tabular-nums', transform: 'translateZ(0)', minWidth: '180px' }} aria-hidden="true">
+          <strong className="text-4xl xs:text-5xl sm:text-6xl font-black tracking-tight text-white font-mono">{value.toFixed(1)}</strong>
+          <span className="text-xs xs:text-sm font-semibold text-cyan-400 uppercase tracking-widest mt-1">{formatSpeed(value).split(' ').slice(1).join(' ') || 'Mbps'}</span>
+          <small className="mt-1 opacity-80">{state === STATES.UPLOAD ? 'UPLOAD' : 'DOWNLOAD'}</small>
         </div>
       </div>
 
