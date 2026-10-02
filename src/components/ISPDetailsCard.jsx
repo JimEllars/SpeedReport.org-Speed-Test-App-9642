@@ -71,6 +71,39 @@ export default function ISPDetailsCard({ meta, metrics }) {
           </div>
         )}
       </dl></div>
+
+      <div className="panel-heading mt-6">
+        <div>
+          <span className="eyebrow">Advanced</span>
+          <h2>Edge Routing Telemetry</h2>
+        </div>
+      </div>
+      <div className="w-full overflow-x-auto">
+        <dl className="detail-list min-w-[280px]">
+          <div>
+            <dt>Server Edge Node</dt>
+            <dd>{meta?.colo ? `${meta.colo} - Cloudflare Anycast` : '—'}</dd>
+          </div>
+          <div>
+            <dt>Handshake Protocol</dt>
+            <dd>
+              {meta?.httpProtocol || '—'}
+              {meta?.tlsCipher && (
+                <span style={{ display: 'inline-block', padding: '2px 8px', background: '#38d997', color: '#000', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold', marginLeft: '8px' }}>
+                  {meta.tlsCipher}
+                </span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Packet Loss</dt>
+            <dd>
+              {metrics?.loss !== undefined ? `${metrics.loss.toFixed(1)}%` : '—'}
+            </dd>
+          </div>
+        </dl>
+      </div>
+
     </section>
   );
 }

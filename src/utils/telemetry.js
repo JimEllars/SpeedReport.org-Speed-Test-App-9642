@@ -1,4 +1,4 @@
-const QUEUE_KEY = 'SPEEDREPORT_TELEMETRY_QUEUE';
+const QUEUE_KEY = 'speedreport_telemetry_queue';
 const TELEMETRY_URL = '/api/telemetry';
 const MAX_QUEUE_SIZE = 50;
 
@@ -26,12 +26,12 @@ export async function sendTelemetryEvent(endpointUrl, payload) {
   const data = JSON.stringify({
     ...payload,
     timestamp: new Date().toISOString(),
-    userAgent: navigator.userAgent,
-    screen: {
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+    screen: typeof window !== 'undefined' ? {
       width: window.innerWidth,
       height: window.innerHeight,
       dpr: window.devicePixelRatio || 1
-    }
+    } : undefined
   });
 
   if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
@@ -110,6 +110,19 @@ if (typeof window !== 'undefined') {
 }
 
 
+
+let flushTimeout = null;
+
+export function scheduleFlush() {
+  if (flushTimeout) {
+    clearTimeout(flushTimeout);
+  }
+  flushTimeout = setTimeout(() => {
+    flushTimeout = null;
+    flushQueue();
+  }, 2000);
+}
+
 export function trackEvent(eventName, data = {}) {
   try {
     let screenResolution = 'unknown';
@@ -152,7 +165,7 @@ export function trackEvent(eventName, data = {}) {
     queue.push(payload);
     saveQueue(queue);
 
-    setTimeout(() => flushQueue(), 0);
+    scheduleFlush();
   } catch (error) {
     // Ensure telemetry transmission never throws user-facing errors
   }

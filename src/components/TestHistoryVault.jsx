@@ -10,7 +10,8 @@ const {
   FiEye,
   FiTrash2,
   FiTrendingUp,
-  FiBookmark
+  FiBookmark,
+  FiUploadCloud
 } = FiIcons;
 
 function getBarHeight(value, maxVal) {
@@ -25,7 +26,7 @@ function formatDate(timestamp) {
   });
 }
 
-export default function TestHistoryVault({ history, onClear, onSelect, onTogglePin }) {
+export default function TestHistoryVault({ history, onClear, onSelect, onTogglePin, onExportVault, onImportVault }) {
   const maxVal = Math.max(
     ...history.map((test) => test.metrics.download),
     1
@@ -71,10 +72,28 @@ export default function TestHistoryVault({ history, onClear, onSelect, onToggleP
 
         {history.length > 0 && (
           <div className="history-actions">
-            <button className="icon-button" onClick={exportHistoryJson}>
+            <button className="icon-button" onClick={onExportVault}>
               <SafeIcon icon={FiDownload} />
-              JSON
+              Export History
             </button>
+            <label className="icon-button" style={{ cursor: 'pointer' }}>
+              <SafeIcon icon={FiUploadCloud} />
+              Import Backup
+              <input
+                type="file"
+                accept=".json"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    onImportVault(event.target.result);
+                  };
+                  reader.readAsText(file);
+                }}
+              />
+            </label>
             <button className="icon-button" onClick={exportHistory}>
               <SafeIcon icon={FiDownload} />
               CSV
