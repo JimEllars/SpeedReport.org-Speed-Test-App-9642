@@ -22,6 +22,38 @@ export function saveQueue(queue) {
   }
 }
 
+export async function sendTelemetryEvent(endpointUrl, payload) {
+  const data = JSON.stringify({
+    ...payload,
+    timestamp: new Date().toISOString(),
+    userAgent: navigator.userAgent,
+    screen: {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      dpr: window.devicePixelRatio || 1
+    }
+  });
+
+  if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+    const blob = new Blob([data], { type: 'application/json' });
+    const success = navigator.sendBeacon(`${endpointUrl}/telemetry`, blob);
+    if (success) return true;
+  }
+
+  try {
+    const res = await fetch(`${endpointUrl}/telemetry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: data,
+      keepalive: true
+    });
+    return res.ok;
+  } catch (err) {
+    console.debug('Telemetry delivery skipped:', err);
+    return false;
+  }
+}
+
 export async function flushQueue(retryCount = 0) {
   const queue = getQueue();
   // Using truthy check on navigator.onLine allows it to proceed if undefined (e.g. in test envs lacking it)
@@ -53,6 +85,7 @@ export async function flushQueue(retryCount = 0) {
       }
     }
   } catch (e) {
+    console.debug('Telemetry delivery skipped:', e);
     // If network fails, re-queue the items
     const currentQueue = getQueue();
     // Prepend to maintain order or append, append is fine

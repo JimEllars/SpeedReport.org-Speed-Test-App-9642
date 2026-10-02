@@ -8,7 +8,6 @@
   box-sizing: border-box;
 }
 
-
 :root {
   --bg-color: #080c14;
   --text-color: #ffffff;
@@ -27,13 +26,21 @@
   --text-muted: #94a3b8;
 }
 
+html, body, #root {
+  height: 100%;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  overscroll-behavior-y: contain;
+  -webkit-tap-highlight-color: transparent;
+}
+
 html {
   background: var(--bg-color);
   color: var(--text-color);
   scroll-behavior: smooth;
   transition: background-color 0.3s, color 0.3s;
 }
-
 
 body {
   -webkit-font-smoothing: antialiased;
@@ -46,10 +53,16 @@ button, a {
 
 #root {
   width: 100%;
-  min-height: 100vh;
-}
-#root {
-  width: 100%;
   max-width: 100%;
   overflow-x: hidden;
+}
+
+.mobile-app-shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding-left: max(0.75rem, env(safe-area-inset-left));
+  padding-right: max(0.75rem, env(safe-area-inset-right));
 }

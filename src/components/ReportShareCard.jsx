@@ -62,7 +62,12 @@ export default function ReportShareCard({ report, isShared }) {
   };
 
   return (
-    <section className="share-card">
+
+<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 transition-all">
+  <div className="w-full sm:max-w-2xl bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-2xl max-h-[85dvh] sm:max-h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200">
+    <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto my-3 sm:hidden shrink-0" />
+    <div className="overflow-y-auto w-full flex-1 w-full max-w-full">
+<section className="share-card">
       <div className="share-card-heading">
         <div className="share-card-icon">
           <SafeIcon icon={FiLink} />
@@ -102,6 +107,11 @@ export default function ReportShareCard({ report, isShared }) {
           Return to this browser’s latest report
         </button>
       )}
-    </section>
+
+</section>
+    </div>
+  </div>
+</div>
+
   );
 }

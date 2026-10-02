@@ -306,11 +306,7 @@ main {
   gap: 18px;
 }
 
-.metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
+
 
 .metric-card {
   padding: 20px;
@@ -785,7 +781,7 @@ footer strong {
 }
 
 @media (max-width: 620px) {
-  .metrics-grid,
+
   .diagnostic-grid {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -820,7 +816,7 @@ footer strong {
     font-size: 39px;
   }
 
-  .metrics-grid,
+
   .diagnostic-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -861,9 +857,9 @@ footer strong {
   }
 }
 @media (max-width: 639px) {
-  .metrics-grid,
+
   .diagnostic-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, 1fr);
     grid-auto-flow: row;
     overflow-x: hidden;
   }
