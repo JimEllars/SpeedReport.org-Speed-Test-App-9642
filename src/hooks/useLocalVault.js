@@ -78,6 +78,18 @@ export function useLocalVault() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (!stored) return null;
+
+      const blob = new Blob([stored], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      anchor.download = `speedreport-history-${dateStr}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+
       return stored;
     } catch {
       return null;

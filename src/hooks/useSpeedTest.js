@@ -35,9 +35,34 @@ export function useSpeedTest(onComplete) {
   const [samples, setSamples] = useState([]);
   const [error, setError] = useState('');
 
+  const rafRef = useRef(null);
+  const latestData = useRef(null);
+
   const updateLive = useCallback((key, value, ping) => {
-    setMetrics((current) => { const updated = { ...current, [key]: value }; if (ping !== undefined && ping !== null) { updated.loadedPing = ping; } return updated; });
-    setSamples((current) => [...current.slice(-24), { value, ping }]);
+    latestData.current = { key, value, ping };
+
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(() => {
+        const { key: k, value: v, ping: p } = latestData.current;
+        setMetrics((current) => {
+          const updated = { ...current, [k]: v };
+          if (p !== undefined && p !== null) {
+            updated.loadedPing = p;
+          }
+          return updated;
+        });
+        setSamples((current) => [...current.slice(-24), { value: v, ping: p }]);
+        rafRef.current = null;
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
   }, []);
 
   const cancel = useCallback(() => {
