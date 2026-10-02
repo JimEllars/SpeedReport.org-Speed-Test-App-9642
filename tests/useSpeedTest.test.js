@@ -5,7 +5,7 @@ import { STATES } from '../src/common/testConstants';
 import * as telemetry from '../src/utils/telemetry';
 
 vi.mock('../src/utils/telemetry', () => ({
-  sendAnonymousTelemetry: vi.fn()
+  sendAnonymousTelemetry: vi.fn(), trackEvent: vi.fn()
 }));
 
 // Mock global fetch

@@ -1,4 +1,4 @@
-import { sendAnonymousTelemetry } from "../utils/telemetry";
+import { sendAnonymousTelemetry, trackEvent } from "../utils/telemetry";
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { STATES } from '../common/testConstants';
@@ -42,6 +42,7 @@ export function useSpeedTest(onComplete) {
 
   const cancel = useCallback(() => {
     if (controllerRef.current) {
+      trackEvent('test_aborted', { phase: state });
       controllerRef.current.abort();
       controllerRef.current = null;
     }
@@ -56,6 +57,8 @@ export function useSpeedTest(onComplete) {
 
     const controller = new AbortController();
     controllerRef.current = controller;
+    trackEvent('test_started');
+      trackEvent('phase_transition', { phase: 'IDLE' });
 
     // Helper to create phase-specific abort signals that respect the main cancellation
     const createPhaseSignal = (timeoutMs = 12000) => {
@@ -85,6 +88,7 @@ export function useSpeedTest(onComplete) {
 
     try {
       setState(STATES.PING);
+      trackEvent('phase_transition', { phase: 'PING' });
 
       let network = {};
       let idle = { ping: 0, jitter: 0, loss: 0 };
@@ -117,6 +121,7 @@ export function useSpeedTest(onComplete) {
       setMetrics((current) => ({ ...current, ...idle }));
 
       setState(STATES.DOWNLOAD);
+      trackEvent('phase_transition', { phase: 'DOWNLOAD' });
       let dlRes = { bandwidth: 0, loadedPing: null };
       const dlPhase = createPhaseSignal(12000);
       try {
@@ -133,6 +138,7 @@ export function useSpeedTest(onComplete) {
       setMetrics((current) => ({ ...current, download: dlRes.bandwidth }));
 
       setState(STATES.UPLOAD);
+      trackEvent('phase_transition', { phase: 'UPLOAD' });
       setSamples([]); // Reset samples for upload
       let ulRes = { bandwidth: 0, loadedPing: null };
       const ulPhase = createPhaseSignal(12000);
@@ -194,7 +200,15 @@ export function useSpeedTest(onComplete) {
         return;
       }
 
-      setError(reason.message || 'The test could not be completed.');
+
+      if (reason.message && reason.message.includes('stall detected')) {
+        setError(reason.message);
+        setState(STATES.ERROR);
+      } else {
+        setError(reason.message || 'The test could not be completed.');
+        setState(STATES.ERROR);
+      }
+
       setState(STATES.ERROR);
     } finally {
       if (controllerRef.current === controller) {

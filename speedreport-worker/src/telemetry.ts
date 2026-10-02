@@ -1,6 +1,7 @@
 import { getCorsHeaders, errorJson } from "./http";
 
 export interface TelemetryPayload {
+  event?: string;
   testId?: string;
   sessionId?: string;
   timestamp?: string;
@@ -30,6 +31,10 @@ export interface TelemetryPayload {
     isp?: string;
     colocation?: string;
     bufferbloatGrade?: string;
+    hardwareConcurrency?: string | number;
+    deviceMemory?: string | number;
+    connection?: any;
+    screen?: string;
   };
   leadInfo?: {
     email?: string;

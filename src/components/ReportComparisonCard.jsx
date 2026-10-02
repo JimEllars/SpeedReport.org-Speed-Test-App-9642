@@ -80,7 +80,7 @@ export default function ReportComparisonCard({ currentReport, previousReport }) 
 
       <div className="w-full overflow-x-auto"><div className="comparison-list min-w-[280px]">
         {rows.map((row) => (
-          <div className="comparison-row" key={row.label}>
+          <div className="comparison-row" style={{ minHeight: "44px", alignItems: "center" }} key={row.label}>
             <span>{row.label}</span>
             <strong>{row.current}</strong>
             <Delta value={row.delta} inverse={row.inverse} />

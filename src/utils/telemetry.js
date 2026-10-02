@@ -76,35 +76,43 @@ if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', () => flushQueue());
 }
 
-export function sendAnonymousTelemetry(report) {
-  try {
-    if (!report || !report.metrics) return;
 
+export function trackEvent(eventName, data = {}) {
+  try {
     let screenResolution = 'unknown';
     if (typeof window !== 'undefined' && window.screen) {
       screenResolution = `${window.screen.width}x${window.screen.height}`;
     }
 
     let userAgent = 'unknown';
+    let hardwareConcurrency = 'unknown';
+    let deviceMemory = 'unknown';
+    let connection = {};
     if (typeof navigator !== 'undefined') {
       userAgent = navigator.userAgent;
+      hardwareConcurrency = navigator.hardwareConcurrency || 'unknown';
+      deviceMemory = navigator.deviceMemory || 'unknown';
+      if (navigator.connection) {
+        connection = {
+          effectiveType: navigator.connection.effectiveType,
+          rtt: navigator.connection.rtt,
+          downlink: navigator.connection.downlink
+        };
+      }
     }
 
     const payload = {
-      sessionId: report.id || 'unknown',
+      event: eventName,
       timestamp: new Date().toISOString(),
-      downloadMbps: report.metrics.download || 0,
-      uploadMbps: report.metrics.upload || 0,
-      latencyMs: report.metrics.ping || 0,
-      jitterMs: report.metrics.jitter || 0,
-      packetLoss: report.metrics.loss || 0,
       clientMeta: {
         userAgent,
-        colocation: report.meta?.colo || 'unknown',
-        isp: report.meta?.asn || 'unknown',
         screen: screenResolution,
-        bufferbloatGrade: report.metrics.bufferbloat || '—'
-      }
+        hardwareConcurrency,
+        deviceMemory,
+        connection,
+        ...(data.clientMeta || {})
+      },
+      ...data
     };
 
     const queue = getQueue();
@@ -112,6 +120,28 @@ export function sendAnonymousTelemetry(report) {
     saveQueue(queue);
 
     setTimeout(() => flushQueue(), 0);
+  } catch (error) {
+    // Ensure telemetry transmission never throws user-facing errors
+  }
+}
+
+export function sendAnonymousTelemetry(report) {
+  try {
+    if (!report || !report.metrics) return;
+
+    trackEvent('test_completed', {
+      sessionId: report.id || 'unknown',
+      downloadMbps: report.metrics.download || 0,
+      uploadMbps: report.metrics.upload || 0,
+      latencyMs: report.metrics.ping || 0,
+      jitterMs: report.metrics.jitter || 0,
+      packetLoss: report.metrics.loss || 0,
+      clientMeta: {
+        colocation: report.meta?.colo || 'unknown',
+        isp: report.meta?.asn || 'unknown',
+        bufferbloatGrade: report.metrics.bufferbloat || '—'
+      }
+    });
   } catch (error) {
     // Ensure telemetry transmission never throws user-facing errors
   }
