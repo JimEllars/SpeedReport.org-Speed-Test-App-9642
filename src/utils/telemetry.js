@@ -45,7 +45,8 @@ export async function sendTelemetryEvent(endpointUrl, payload) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: data,
-      keepalive: true
+      keepalive: true,
+      signal: AbortSignal.timeout(2500)
     });
     return res.ok;
   } catch (err) {
@@ -77,7 +78,8 @@ export async function flushQueue(retryCount = 0) {
         keepalive: true,
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        signal: AbortSignal.timeout(2500)
       });
 
       if (!response.ok && response.status !== 400) {
