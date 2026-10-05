@@ -146,7 +146,7 @@ main {
 
 .gauge-card {
   padding: 28px 34px;
-  min-height: 524px;
+  min-height: auto;
   position: relative;
   overflow: hidden;
 }
@@ -310,7 +310,7 @@ main {
 
 .metric-card {
   padding: 20px;
-  min-height: 110px;
+  min-height: 100px;
 }
 
 .metric-top {
