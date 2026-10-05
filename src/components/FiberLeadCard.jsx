@@ -53,7 +53,7 @@ export default function FiberLeadCard({ report }) {
         }
       };
 
-      const endpoint = `${API_BASE}/telemetry`;
+      const endpoint = `${API_BASE}/api/lead`;
 
       const response = await fetch(endpoint, {
         method: 'POST',

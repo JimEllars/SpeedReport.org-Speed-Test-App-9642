@@ -3,7 +3,7 @@ import { runExecutiveReportCron } from "./executiveReporter";
 import { getCorsHeaders, json, telemetryHeaders, errorJson } from "./http";
 import { handleMeta } from "./meta";
 import { handleUpload } from "./upload";
-import { handleTelemetry } from "./telemetry";
+import { handleTelemetry, handleLeadSubmission } from "./telemetry";
 
 interface WorkerEnv {
   ASSETS: Fetcher;
@@ -72,6 +72,11 @@ export default {
 
     if (url.pathname === "/api/upload" && request.method === "POST") {
       return handleUpload(request);
+    }
+
+
+    if ((url.pathname === "/api/lead" || url.pathname === "/lead") && request.method === "POST") {
+      return handleLeadSubmission(request, env, ctx);
     }
 
     if ((url.pathname === "/api/telemetry" || url.pathname === "/telemetry") && request.method === "POST") {
