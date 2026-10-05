@@ -16,9 +16,11 @@ jobs:
         with:
           node-version: 24
           cache: 'npm'
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
+      - name: Build & Validate
+        run: |
+          npm ci
+          npm run test
+          npm run build
 
   deploy-worker:
     name: Deploy production Worker
@@ -33,20 +35,11 @@ jobs:
         run: |
           npm ci
           npm run build
-      - name: Install root dependencies & build
-        run: |
-          npm ci
-          npm run build
-      - name: Install Worker dependencies
-        run: |
-          cd speedreport-worker
-          npm ci
       - name: Validate / Deploy Worker
         run: |
           cd speedreport-worker
-          rm -rf ../.wrangler .wrangler
+          npm ci
           if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
-            echo "No Cloudflare API token detected. Executing dry-run verification."
             npx wrangler deploy --dry-run
           else
             npx wrangler deploy

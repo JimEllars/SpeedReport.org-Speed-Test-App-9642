@@ -75,7 +75,7 @@ export function useSpeedTest(onComplete) {
     setMetrics(initialMetrics);
     setSamples([]);
     setError('');
-  }, []);
+  }, [state]);
 
   const start = useCallback(async () => {
     controllerRef.current?.abort();
