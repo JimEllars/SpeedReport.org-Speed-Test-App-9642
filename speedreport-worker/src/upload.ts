@@ -2,14 +2,14 @@ import { json } from './http';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
-export async function handleUpload(request: Request): Promise<Response> {
+export async function handleUpload(request: Request, env?: any): Promise<Response> {
   if (!request.body) {
-    return json({ error: 'An upload payload is required' }, 400, request);
+    return json({ error: 'An upload payload is required' }, 400, request, env);
   }
 
   const contentLength = Number(request.headers.get('content-length'));
   if (Number.isFinite(contentLength) && contentLength > MAX_UPLOAD_BYTES) {
-    return json({ error: 'Upload payload exceeds the 8 MiB limit' }, 413, request);
+    return json({ error: 'Upload payload exceeds the 8 MiB limit' }, 413, request, env);
   }
 
   const started = Date.now();
@@ -27,12 +27,12 @@ export async function handleUpload(request: Request): Promise<Response> {
 
       receivedBytes += value.byteLength;
       if (receivedBytes > MAX_UPLOAD_BYTES) {
-        return json({ error: 'Upload payload exceeds the 8 MiB limit' }, 413, request);
+        return json({ error: 'Upload payload exceeds the 8 MiB limit' }, 413, request, env);
       }
     }
   } catch (error) {
     console.error('Unable to read upload payload', error);
-    return json({ error: 'Unable to read upload payload' }, 400, request);
+    return json({ error: 'Unable to read upload payload' }, 400, request, env);
   } finally {
     reader.releaseLock();
   }
@@ -41,7 +41,7 @@ export async function handleUpload(request: Request): Promise<Response> {
   const response = json({
     receivedBytes,
     durationMs
-  }, 200, request);
+  }, 200, request, env);
 
   response.headers.set('X-Received-Bytes', String(receivedBytes));
   response.headers.set('X-Duration-Ms', String(durationMs));

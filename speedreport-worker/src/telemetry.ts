@@ -113,7 +113,7 @@ export async function handleTelemetry(request: Request, env: any, ctx: Execution
     let payloads: any[] = Array.isArray(body) ? body : (body && typeof body === "object" ? [body] : []);
 
     if (payloads.length === 0) {
-      return errorJson("Invalid telemetry payload", "invalid_payload", 400, request);
+      return errorJson("Invalid telemetry payload", "invalid_payload", 400, request, env);
     }
 
     ctx.waitUntil(
@@ -191,7 +191,7 @@ export async function handleTelemetry(request: Request, env: any, ctx: Execution
     return new Response(JSON.stringify({ success: true, received: true, id: correlationId }), {
       status: 202,
       headers: {
-        ...getCorsHeaders(request),
+        ...getCorsHeaders(request, env),
         "Content-Type": "application/json"
       }
     });
@@ -206,7 +206,7 @@ export async function handleTelemetry(request: Request, env: any, ctx: Execution
     return new Response(JSON.stringify({ error: true, message: "Invalid payload" }), {
       status: 400,
       headers: {
-        ...getCorsHeaders(request),
+        ...getCorsHeaders(request, env),
         "Content-Type": "application/json"
       }
     });
@@ -237,7 +237,7 @@ export async function handleLeadSubmission(request: Request, env: any, ctx: Exec
     const payload = body as LeadPayload;
 
     if (!payload.testId || !payload.metrics) {
-      return errorJson("Invalid lead payload", "invalid_payload", 400, request);
+      return errorJson("Invalid lead payload", "invalid_payload", 400, request, env);
     }
 
     if (env.PROSPECT_STORE) {
@@ -245,7 +245,7 @@ export async function handleLeadSubmission(request: Request, env: any, ctx: Exec
       const current = await env.PROSPECT_STORE.get(key);
       const count = current ? parseInt(current, 10) : 0;
       if (count >= 5) {
-        return errorJson("Rate limit exceeded", "rate_limit", 429, request);
+        return errorJson("Rate limit exceeded", "rate_limit", 429, request, env);
       }
       await env.PROSPECT_STORE.put(key, (count + 1).toString(), { expirationTtl: 3600 });
     }
@@ -273,11 +273,11 @@ export async function handleLeadSubmission(request: Request, env: any, ctx: Exec
     return new Response(JSON.stringify({ success: true, leadId }), {
       status: 200,
       headers: {
-        ...getCorsHeaders(request),
+        ...getCorsHeaders(request, env),
         "Content-Type": "application/json"
       }
     });
   } catch (error) {
-    return errorJson("Invalid payload", "invalid_payload", 400, request);
+    return errorJson("Invalid payload", "invalid_payload", 400, request, env);
   }
 }

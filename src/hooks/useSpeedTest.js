@@ -183,6 +183,7 @@ export function useSpeedTest(onComplete) {
       const pings = [dlRes.loadedPing, ulRes.loadedPing].filter((p) => p !== null);
       const maxLoadedPing = pings.length > 0 ? Math.max(...pings) : idle.ping;
       const loadedPing = pings.length > 0 ? (pings.reduce((a,b)=>a+b,0)/pings.length) : idle.ping;
+      const loadedDelta = Math.max(0, loadedPing - idle.ping); // Use avg loaded ping for bufferbloat grade as it's more stable
       const delta = Math.max(0, maxLoadedPing - idle.ping);
 
       const completeMetrics = {
@@ -194,7 +195,7 @@ export function useSpeedTest(onComplete) {
         loadedPing: loadedPing,
         loadedJitter: 0,
         loadedLoss: 0,
-        bufferbloat: bufferGrade(delta)
+        bufferbloat: bufferGrade(loadedDelta), bufferbloatDeltaMs: loadedDelta
       };
 
       let partialFailure = false;
