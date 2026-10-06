@@ -33,7 +33,7 @@
     "crons": ["0 12 * * *"],
   },
   "vars": {
-    "REPORT_RECIPIENT_TO": "james.ellars@axim.us.com",
+    "REPORT_RECIPIENT_TO": "contact@speedreport.org",
     "REPORT_RECIPIENT_BCC": "jrellars@gmail.com",
   },
 }
