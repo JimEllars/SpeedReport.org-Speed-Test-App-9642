@@ -22,7 +22,9 @@ function App() {
     latestReport,
     save,
     clear,
-    togglePin
+    togglePin,
+    exportVaultToJson,
+    importVaultFromJson
   } = useLocalVault();
   const [report, setReport] = useState(null);
   const [isShared, setIsShared] = useState(false);
@@ -156,6 +158,8 @@ useEffect(() => {
             complete={complete || Boolean(report)}
           />
           <TestHistoryVault
+            onExportVault={exportVaultToJson}
+            onImportVault={importVaultFromJson}
             history={history}
             onClear={handleClearHistory}
             onSelect={handleSelectReport}

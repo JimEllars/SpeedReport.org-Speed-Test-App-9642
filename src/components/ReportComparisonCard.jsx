@@ -1,4 +1,3 @@
-import {  } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import './ReportComparisonCard.css';
