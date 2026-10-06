@@ -101,6 +101,7 @@ useEffect(() => {
 
       <main>
         <section className="intro">
+          <div className="hidden sm:block">
           <div>
             <span className="eyebrow">Commercial-grade edge testing</span>
             <h1>
@@ -113,6 +114,10 @@ useEffect(() => {
             Measure bandwidth, latency, jitter, packet loss, and loaded performance
             —then translate the numbers into operational readiness.
           </p>
+        </div>
+          <div className="sm:hidden text-center mb-2">
+            <span className="eyebrow mx-auto inline-block">Commercial-Grade Edge Diagnostics</span>
+          </div>
         </section>
 
         <div className="dashboard-grid w-full max-w-md sm:max-w-xl md:max-w-2xl mx-auto">

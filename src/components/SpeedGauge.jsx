@@ -124,7 +124,7 @@ export default function SpeedGauge({
         </div>
       </div>
 
-      <div className="gauge relative w-full max-w-[280px] xs:max-w-[320px] sm:max-w-[380px] mx-auto aspect-square flex items-center justify-center overflow-visible" style={{ minHeight: '260px', transform: 'translateZ(0)' }} aria-live="polite" role="meter" aria-valuenow={value} aria-valuemin="0" aria-valuemax={maxScaleMbps}>
+      <div className="gauge relative w-full max-w-[240px] xs:max-w-[280px] sm:max-w-[380px] mx-auto aspect-square flex items-center justify-center overflow-visible" style={{ minHeight: '260px', transform: 'translateZ(0)' }} aria-live="polite" role="meter" aria-valuenow={value} aria-valuemin="0" aria-valuemax={maxScaleMbps}>
         <svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet" className="w-full h-auto max-w-full mx-auto overflow-visible transform select-none" aria-label={`${value.toFixed(1)} megabits per second`}>
           <path className="gauge-track" d="M40 200 A160 160 0 0 1 360 200" aria-hidden="true" />
           <motion.path

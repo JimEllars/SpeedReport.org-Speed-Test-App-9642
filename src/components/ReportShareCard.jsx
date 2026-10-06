@@ -10,13 +10,7 @@ import './ReportShareCard.css';
 const { FiCheck, FiCopy, FiLink, FiShare2, FiX } = FiIcons;
 
 export default function ReportShareCard({ report, isShared, onClose }) {
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
-  const [copied, setCopied] = useState(false);
+    const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
 
   if (!report) return null;
@@ -69,13 +63,6 @@ export default function ReportShareCard({ report, isShared, onClose }) {
 
   return (
 
-<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4 transition-all" onClick={onClose}>
-  <div onClick={(e) => e.stopPropagation()} className="w-full sm:max-w-2xl bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-2xl max-h-[85dvh] sm:max-h-[80vh] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom duration-200">
-    <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto my-3 sm:hidden shrink-0" />
-    <button onClick={onClose} className="absolute top-4 right-4 sm:hidden p-2 text-slate-400 hover:text-white" style={{ minWidth: '44px', minHeight: '44px' }}>
-      <SafeIcon icon={FiX} size={24} />
-    </button>
-    <div className="overflow-y-auto w-full flex-1 w-full max-w-full">
 <section className="share-card">
       <div className="share-card-heading">
         <div className="share-card-icon">
@@ -118,9 +105,6 @@ export default function ReportShareCard({ report, isShared, onClose }) {
       )}
 
 </section>
-    </div>
-  </div>
-</div>
 
   );
 }
