@@ -104,7 +104,6 @@ useEffect(() => {
       <main>
         <section className="intro">
           <div className="hidden sm:block">
-          <div>
             <span className="eyebrow">Commercial-grade edge testing</span>
             <h1>
               Know if your connection
@@ -112,17 +111,16 @@ useEffect(() => {
               <em>means business.</em>
             </h1>
           </div>
-          <p>
+          <p className="hidden sm:block">
             Measure bandwidth, latency, jitter, packet loss, and loaded performance
             —then translate the numbers into operational readiness.
           </p>
-        </div>
-          <div className="sm:hidden text-center mb-2">
+          <div className="sm:hidden text-center mb-2 col-span-full">
             <span className="eyebrow mx-auto inline-block">Commercial-Grade Edge Diagnostics</span>
           </div>
         </section>
 
-        <div className="dashboard-grid w-full max-w-md sm:max-w-xl md:max-w-2xl mx-auto">
+        <div className="dashboard-grid w-full max-w-md sm:max-w-xl lg:max-w-none mx-auto">
           <SpeedGauge
             {...test}
             onStart={test.start}
@@ -152,7 +150,7 @@ useEffect(() => {
         <DiagnosticsSummary report={report} />
         <FiberLeadCard report={report} />
 
-        <div className="lower-grid flex flex-col gap-4 sm:gap-6 mt-4 sm:mt-6">
+        <div className="lower-grid w-full gap-4 sm:gap-6 mt-4 sm:mt-6">
           <BusinessAuditCard
             metrics={displayedMetrics}
             complete={complete || Boolean(report)}
