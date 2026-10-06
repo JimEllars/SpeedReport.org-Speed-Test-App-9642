@@ -14,7 +14,7 @@ function initializeChunk() {
   }
 }
 
-export function handleDownload(request: Request, url: URL): Response {
+export function handleDownload(request: Request, url: URL, env?: any): Response {
   initializeChunk();
   const requested = Number(url.searchParams.get('bytes')) || DEFAULT_BYTES;
   const target = Math.min(Math.max(requested, CHUNK_SIZE), MAX_BYTES);
@@ -43,7 +43,7 @@ export function handleDownload(request: Request, url: URL): Response {
 
   return new Response(stream, {
     headers: {
-      ...getCorsHeaders(request),
+      ...getCorsHeaders(request, env),
       ...telemetryHeaders(request),
       'Content-Type': 'application/octet-stream',
       'Content-Length': String(target),

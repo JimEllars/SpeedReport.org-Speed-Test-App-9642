@@ -13,14 +13,20 @@ export const defaultCorsHeaders = {
   'X-Accel-Buffering': 'no'
 };
 
-export function getCorsHeaders(request?: Request): Record<string, string> {
+export function getCorsHeaders(request?: Request, env?: any): Record<string, string> {
   const origin = request?.headers.get('Origin');
   let allowedOrigin = '*';
 
-  if (origin && (origin.endsWith('.pages.dev') || origin === 'https://speedreport.org' || origin === 'http://localhost:5173')) {
-    allowedOrigin = origin;
-  } else if (origin) {
-    allowedOrigin = origin; // Just echo it back dynamically or keep * if we don't care, but requirement said to accept from specific domains. Let's just echo back the origin if valid, or fallback to *.
+  if (origin) {
+    const defaultAllowed = ['https://speedreport.org', 'http://localhost:5173'];
+    const envAllowed = env?.ALLOWED_ORIGINS ? env.ALLOWED_ORIGINS.split(',').map((s: string) => s.trim()) : [];
+    const allAllowed = [...defaultAllowed, ...envAllowed];
+
+    if (allAllowed.includes(origin) || origin.endsWith('.pages.dev')) {
+      allowedOrigin = origin;
+    } else {
+      allowedOrigin = defaultAllowed[0]; // Strict fallback instead of mirroring
+    }
   }
 
   return {
@@ -55,11 +61,11 @@ export function telemetryHeaders(request: Request): Record<string, string> {
   return headers;
 }
 
-export function json(data: unknown, status = 200, request?: Request): Response {
+export function json(data: unknown, status = 200, request?: Request, env?: any): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
-      ...getCorsHeaders(request),
+      ...getCorsHeaders(request, env),
       ...(request ? telemetryHeaders(request) : {}),
       'Content-Type': 'application/json'
     }
@@ -70,7 +76,8 @@ export function errorJson(
   message: string,
   code: string,
   status = 400,
-  request?: Request
+  request?: Request,
+  env?: any
 ): Response {
   return new Response(
     JSON.stringify({

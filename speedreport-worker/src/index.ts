@@ -28,38 +28,38 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
-      const headers = getCorsHeaders(request);
+      const headers = getCorsHeaders(request, env);
       return new Response(null, { status: 204, headers });
     }
 
     if (url.pathname === "/api/admin/trigger-report" && request.method === "POST") {
       if (!env.ADMIN_SECRET) {
         console.error("ADMIN_SECRET is not configured; rejecting report trigger.");
-        return errorJson("Administrative reporting is unavailable", "admin_unavailable", 503, request);
+        return errorJson("Administrative reporting is unavailable", "admin_unavailable", 503, request, env);
       }
 
       if (!isAuthorized(request, env.ADMIN_SECRET)) {
-        return errorJson("Unauthorized", "unauthorized", 401, request);
+        return errorJson("Unauthorized", "unauthorized", 401, request, env);
       }
 
       // Release workflow: keep manual reports off the response path so admin calls remain reliable.
       ctx.waitUntil(runExecutiveReportCron(env));
-      return json({ status: "Report queued" }, 202, request);
+      return json({ status: "Report queued" }, 202, request, env);
     }
 
     if (url.pathname === "/health" && request.method === "GET") {
-      return json({ status: "healthy", timestamp: Date.now() }, 200, request);
+      return json({ status: "healthy", timestamp: Date.now() }, 200, request, env);
     }
 
     if (url.pathname === "/api/meta" && request.method === "GET") {
-      return handleMeta(request);
+      return handleMeta(request, env);
     }
 
     if (url.pathname === "/api/ping" && request.method === "GET") {
       return new Response(null, {
         status: 204,
         headers: {
-          ...getCorsHeaders(request),
+          ...getCorsHeaders(request, env),
           ...telemetryHeaders(request),
           "Content-Length": "0",
         },
@@ -67,11 +67,11 @@ export default {
     }
 
     if (url.pathname === "/api/download" && request.method === "GET") {
-      return handleDownload(request, url);
+      return handleDownload(request, url, env);
     }
 
     if (url.pathname === "/api/upload" && request.method === "POST") {
-      return handleUpload(request);
+      return handleUpload(request, env);
     }
 
 

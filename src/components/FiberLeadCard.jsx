@@ -9,7 +9,9 @@ const { FiZap, FiSend, FiLoader } = FiIcons;
 export default function FiberLeadCard({ report }) {
   const [email, setEmail] = useState('');
   const [postalCode, setPostalCode] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(() => {
+    try { return localStorage.getItem('sr_lead_submitted') === 'true'; } catch { return false; }
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -72,6 +74,7 @@ export default function FiberLeadCard({ report }) {
       sendAnonymousTelemetry(telemetryReport);
 
       setSubmitted(true);
+      try { localStorage.setItem('sr_lead_submitted', 'true'); } catch (e) { /* ignore */ }
     } catch (err) {
       console.error('Lead capture error:', err);
       setError('Unable to send request. Please try again.');

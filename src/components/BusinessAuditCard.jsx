@@ -8,10 +8,13 @@ const { FiPhoneCall, FiVideo, FiCloud, FiUsers, FiCheckCircle, FiFileText } = Fi
 
 export default function BusinessAuditCard({ metrics, complete, reportId }) {
   const audit = getReadiness(metrics);
-  const [requested, setRequested] = useState(false);
+  const [requested, setRequested] = useState(() => {
+    try { return localStorage.getItem('sr_audit_requested') === 'true'; } catch { return false; }
+  });
 
   const handleRequestAudit = () => {
     setRequested(true);
+    try { localStorage.setItem('sr_audit_requested', 'true'); } catch (e) { /* ignore */ }
     const payload = {
       id: reportId || 'unknown',
       metrics: metrics,

@@ -280,15 +280,14 @@ export async function measureDownload(onProgress = () => {}, signal) {
     if (currentMbps > 100) chunkSize = 10 * 1024 * 1024;
     if (currentMbps > 200) chunkSize = 25 * 1024 * 1024;
 
-    // In our loop, when a stream finishes we can start another one if not aborted
     return consumeDownload(chunkSize, calculator, phaseSignal).then(() => {
       if (!signal?.aborted && !phaseFinished) {
          const currentMbps = calculator.getLiveSpeedMbps();
          if (currentMbps > 0 && currentMbps < 20 && activeStreams > 2) {
              activeStreams--;
-             return; // Stop this stream to drop to 2
+             return;
          }
-         return startStream(); // Keep downloading if we haven't timed out
+         return startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); });
       }
     });
   };
@@ -361,29 +360,44 @@ function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
 
+    const cleanup = () => {
+      if (phaseSignal) phaseSignal.removeEventListener('abort', onAbort);
+      xhr.removeEventListener('load', onLoad);
+      xhr.removeEventListener('error', onError);
+      xhr.removeEventListener('abort', onXhrAbort);
+      if (xhr.upload) xhr.upload.removeEventListener('progress', onProgress);
+    };
+
+    const onAbort = () => {
+      cleanup();
+      xhr.abort();
+      reject(new DOMException('The diagnostic was cancelled.', 'AbortError'));
+    };
+
     if (phaseSignal) {
       if (phaseSignal.aborted) {
-        reject(new DOMException('The diagnostic was cancelled.', 'AbortError'));
-        return;
+        return onAbort();
       }
-      phaseSignal.addEventListener('abort', () => {
-        xhr.abort();
-        reject(new DOMException('The diagnostic was cancelled.', 'AbortError'));
-      });
+      phaseSignal.addEventListener('abort', onAbort);
     }
 
     let lastLoaded = 0;
 
-    xhr.upload.addEventListener('progress', (event) => {
+    const onProgress = (event) => {
       if (phaseSignal?.aborted) return;
       const loadedBytes = event.loaded - lastLoaded;
       calculator.addBytes(loadedBytes);
       lastLoaded = event.loaded;
-    });
+    };
 
-    xhr.addEventListener('load', () => resolve());
-    xhr.addEventListener('error', () => reject(new Error('Upload endpoint unavailable')));
-    xhr.addEventListener('abort', () => reject(new DOMException('The diagnostic was cancelled.', 'AbortError')));
+    const onLoad = () => { cleanup(); resolve(); };
+    const onError = () => { cleanup(); reject(new Error('Upload endpoint unavailable')); };
+    const onXhrAbort = () => { cleanup(); reject(new DOMException('The diagnostic was cancelled.', 'AbortError')); };
+
+    xhr.upload.addEventListener('progress', onProgress);
+    xhr.addEventListener('load', onLoad);
+    xhr.addEventListener('error', onError);
+    xhr.addEventListener('abort', onXhrAbort);
 
     xhr.open('POST', endpoint('/api/upload'));
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
@@ -440,7 +454,7 @@ export async function measureUpload(onProgress = () => {}, signal) {
          activeStreams--;
          return;
       }
-      return startStream(); // Keep uploading if we haven't timed out
+      return startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); });
     }
   });
 

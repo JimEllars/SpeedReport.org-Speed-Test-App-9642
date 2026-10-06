@@ -1,6 +1,6 @@
 import { json } from './http';
 
-export function handleMeta(request: Request): Response {
+export function handleMeta(request: Request, env?: any): Response {
   const cf = (request as any).cf || {};
   const clientIpSanitized = request.headers.get("cf-connecting-ip") || "127.0.0.1";
   const meta = {
@@ -18,5 +18,5 @@ export function handleMeta(request: Request): Response {
     timestamp: Date.now()
   };
 
-  return json(meta, 200, request);
+  return json(meta, 200, request, env);
 }

@@ -51,7 +51,7 @@ export default function ReportShareCard({ report, isShared, onClose }) {
     }
 
     // Fallback to clipboard
-    await navigator.clipboard.writeText(shareData.text);
+    try { await navigator.clipboard.writeText(shareData.text); } catch { setError('Clipboard access denied. Please copy manually.'); return; }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
