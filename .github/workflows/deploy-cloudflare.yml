@@ -39,6 +39,7 @@ jobs:
         run: |
           cd speedreport-worker
           npm ci
+          rm -rf ../.wrangler .wrangler
           if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
             npx wrangler deploy --dry-run
           else
