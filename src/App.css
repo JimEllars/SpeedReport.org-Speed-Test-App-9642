@@ -132,8 +132,9 @@ main {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(360px, .8fr) 1.2fr;
-  gap: 18px;
+  grid-template-columns: minmax(380px, 0.85fr) 1.15fr;
+  gap: 24px;
+  align-items: start;
 }
 
 .gauge-card,
@@ -553,7 +554,7 @@ main {
 .lower-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18px;
+  gap: 24px;
   margin-top: 18px;
 }
 
@@ -769,10 +770,15 @@ footer strong {
 }
 
 @media (max-width: 900px) {
-  .dashboard-grid,
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
   .lower-grid {
     grid-template-columns: 1fr;
+    gap: 16px;
   }
+
 
   .intro {
     grid-template-columns: 1fr;

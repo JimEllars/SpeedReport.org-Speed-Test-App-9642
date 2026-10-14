@@ -54,7 +54,7 @@ export default function MetricsGrid({ metrics }) {
               <SafeIcon icon={icon} />
               <span>{label}</span>
             </div>
-            <div className="metric-value text-lg xs:text-xl sm:text-2xl md:text-3xl font-black tabular-nums break-words leading-tight tracking-tight">
+            <div className="metric-value text-xl sm:text-2xl md:text-3xl font-black tabular-nums break-words leading-tight tracking-tight">
               {value} <span className="text-sm font-normal text-slate-400 ml-1">{unit}</span>
             </div>
           </div>
@@ -68,7 +68,7 @@ export default function MetricsGrid({ metrics }) {
               <SafeIcon icon={icon} />
               <span>{label}</span>
             </div>
-            <div className="metric-value text-sm xs:text-base sm:text-lg font-semibold tabular-nums break-words text-slate-300 leading-tight">
+            <div className="metric-value text-sm sm:text-base md:text-lg font-semibold tabular-nums break-words text-slate-300 leading-tight">
               {value} <span className="text-xs font-normal text-slate-500 ml-1">{unit}</span>
             </div>
           </div>
