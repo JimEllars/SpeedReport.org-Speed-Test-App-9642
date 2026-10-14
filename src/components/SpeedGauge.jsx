@@ -125,7 +125,7 @@ export default function SpeedGauge({
       </div>
 
       <div
-       className="gauge relative w-full max-w-[240px] xs:max-w-[280px] sm:max-w-[340px] md:max-w-[380px] lg:max-w-[420px] mx-auto aspect-square flex items-center justify-center overflow-visible"
+       className="gauge relative w-full max-w-[280px] xs:max-w-[320px] sm:max-w-[380px] lg:max-w-[440px] mx-auto aspect-[5/3] flex items-end justify-center overflow-visible"
        style={{ transform: 'translateZ(0)' }}
        aria-live="polite"
        role="meter"
@@ -146,7 +146,7 @@ export default function SpeedGauge({
           />
         </svg>
 
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none" style={{ fontVariantNumeric: 'tabular-nums', transform: 'translateZ(0)', minWidth: '180px' }} aria-hidden="true">
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none" style={{ fontVariantNumeric: 'tabular-nums', transform: 'translateZ(0)', paddingTop: '20px' }} aria-hidden="true">
           <strong className="text-4xl xs:text-5xl sm:text-6xl font-black tracking-tight text-white font-mono">{value.toFixed(1)}</strong>
           <span className="text-xs xs:text-sm font-semibold text-cyan-400 uppercase tracking-widest mt-1">{formatSpeed(value).split(' ').slice(1).join(' ') || 'Mbps'}</span>
           <small className="mt-1 opacity-80">{state === STATES.UPLOAD ? 'UPLOAD' : 'DOWNLOAD'}</small>
