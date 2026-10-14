@@ -3,7 +3,18 @@ import { formatDuration, getReadiness } from './readiness';
 import QRCode from 'qrcode';
 import { createReportShareUrl } from './reportShareLinks';
 
+export async function generateReportFingerprint(report) {
+  const raw = `${report.id}|${report.timestamp}|${report.metrics.download}|${report.metrics.upload}|${report.metrics.ping}`;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(raw);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return `SHA256-${hashHex.substring(0, 16).toUpperCase()}`;
+}
+
 export async function downloadReport(report) {
+  const fingerprint = await generateReportFingerprint(report);
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([612, 792]);
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
@@ -172,6 +183,16 @@ export async function downloadReport(report) {
     }
   );
 
+  page.drawText(
+    `Digital Fingerprint: ${fingerprint}`,
+    {
+      x: 42,
+      y: 36,
+      size: 8,
+      font: regular,
+      color: muted
+    }
+  );
 
   const shareUrl = createReportShareUrl(report);
   const qrDataUrl = await QRCode.toDataURL(shareUrl, { width: 100, margin: 0, scale: 2 });

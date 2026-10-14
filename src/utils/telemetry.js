@@ -26,7 +26,7 @@ export async function sendTelemetryEvent(endpointUrl, payload) {
   const data = JSON.stringify({
     ...payload,
     timestamp: new Date().toISOString(),
-    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.substring(0, 50) + '...' : 'unknown',
     screen: typeof window !== 'undefined' ? {
       width: window.innerWidth,
       height: window.innerHeight,
@@ -133,13 +133,9 @@ export function trackEvent(eventName, data = {}) {
     }
 
     let userAgent = 'unknown';
-    let hardwareConcurrency = 'unknown';
-    let deviceMemory = 'unknown';
     let connection = {};
     if (typeof navigator !== 'undefined') {
-      userAgent = navigator.userAgent;
-      hardwareConcurrency = navigator.hardwareConcurrency || 'unknown';
-      deviceMemory = navigator.deviceMemory || 'unknown';
+      userAgent = navigator.userAgent ? navigator.userAgent.substring(0, 50) + '...' : 'unknown';
       if (navigator.connection) {
         connection = {
           effectiveType: navigator.connection.effectiveType,
@@ -155,8 +151,6 @@ export function trackEvent(eventName, data = {}) {
       clientMeta: {
         userAgent,
         screen: screenResolution,
-        hardwareConcurrency,
-        deviceMemory,
         connection,
         ...(data.clientMeta || {})
       },
