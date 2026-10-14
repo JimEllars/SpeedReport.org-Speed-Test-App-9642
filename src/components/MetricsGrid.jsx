@@ -16,20 +16,20 @@ export default function MetricsGrid({ metrics }) {
   const status = readiness.grade;
 
   const coreItems = [
-    ['Download', metrics.download.toFixed(1), 'Mbps', FiDownload],
-    ['Upload', metrics.upload.toFixed(1), 'Mbps', FiUpload],
-    ['Latency', (metrics.loadedPing || metrics.ping).toFixed(1), 'ms', FiClock],
+    ['Download', (Number(metrics.download) || 0).toFixed(1), 'Mbps', FiDownload],
+    ['Upload', (Number(metrics.upload) || 0).toFixed(1), 'Mbps', FiUpload],
+    ['Latency', (Number(metrics.loadedPing || metrics.ping) || 0).toFixed(1), 'ms', FiClock],
   ];
 
   const secondaryItems = [
-    ['Jitter', metrics.jitter.toFixed(1), 'ms variance', FiActivity],
+    ['Jitter', (Number(metrics.jitter) || 0).toFixed(1), 'ms variance', FiActivity],
     [
       'Bufferbloat',
       metrics.bufferbloat,
-      metrics.loadedPing ? `${metrics.loadedPing} ms loaded` : 'grade',
+      metrics.loadedPing ? `${(Number(metrics.loadedPing) || 0).toFixed(1)} ms loaded` : 'grade',
       FiZap
     ],
-    ['Packet loss', metrics.loss.toFixed(1), '%', FiWifi]
+    ['Packet loss', (Number(metrics.loss) || 0).toFixed(1), '%', FiWifi]
   ];
 
   return (

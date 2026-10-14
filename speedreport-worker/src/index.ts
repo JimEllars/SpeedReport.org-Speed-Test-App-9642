@@ -32,55 +32,51 @@ export default {
       return new Response(null, { status: 204, headers });
     }
 
-    if (url.pathname === "/api/admin/trigger-report" && request.method === "POST") {
-      if (!env.ADMIN_SECRET) {
-        console.error("ADMIN_SECRET is not configured; rejecting report trigger.");
-        return errorJson("Administrative reporting is unavailable", "admin_unavailable", 503, request, env);
+    const path = url.pathname.replace(/\/$/, ""); // Normalize trailing slashes
+
+    if (request.method === "GET") {
+      switch (path) {
+        case "/health":
+          return json({ status: "healthy", timestamp: Date.now() }, 200, request, env);
+        case "/api/meta":
+          return handleMeta(request, env);
+        case "/api/ping":
+          return new Response(null, {
+            status: 204,
+            headers: {
+              ...getCorsHeaders(request, env),
+              ...telemetryHeaders(request),
+              "Content-Length": "0",
+            },
+          });
+        case "/api/download":
+          return handleDownload(request, url, env);
       }
+    }
 
-      if (!isAuthorized(request, env.ADMIN_SECRET)) {
-        return errorJson("Unauthorized", "unauthorized", 401, request, env);
+    if (request.method === "POST") {
+      switch (path) {
+        case "/api/admin/trigger-report":
+          if (!env.ADMIN_SECRET) {
+            console.error("ADMIN_SECRET is not configured; rejecting report trigger.");
+            return errorJson("Administrative reporting is unavailable", "admin_unavailable", 503, request, env);
+          }
+
+          if (!isAuthorized(request, env.ADMIN_SECRET)) {
+            return errorJson("Unauthorized", "unauthorized", 401, request, env);
+          }
+
+          ctx.waitUntil(runExecutiveReportCron(env));
+          return json({ status: "Report queued" }, 202, request, env);
+        case "/api/upload":
+          return handleUpload(request, env);
+        case "/api/lead":
+        case "/lead":
+          return handleLeadSubmission(request, env, ctx);
+        case "/api/telemetry":
+        case "/telemetry":
+          return handleTelemetry(request, env, ctx);
       }
-
-      // Release workflow: keep manual reports off the response path so admin calls remain reliable.
-      ctx.waitUntil(runExecutiveReportCron(env));
-      return json({ status: "Report queued" }, 202, request, env);
-    }
-
-    if (url.pathname === "/health" && request.method === "GET") {
-      return json({ status: "healthy", timestamp: Date.now() }, 200, request, env);
-    }
-
-    if (url.pathname === "/api/meta" && request.method === "GET") {
-      return handleMeta(request, env);
-    }
-
-    if (url.pathname === "/api/ping" && request.method === "GET") {
-      return new Response(null, {
-        status: 204,
-        headers: {
-          ...getCorsHeaders(request, env),
-          ...telemetryHeaders(request),
-          "Content-Length": "0",
-        },
-      });
-    }
-
-    if (url.pathname === "/api/download" && request.method === "GET") {
-      return handleDownload(request, url, env);
-    }
-
-    if (url.pathname === "/api/upload" && request.method === "POST") {
-      return handleUpload(request, env);
-    }
-
-
-    if ((url.pathname === "/api/lead" || url.pathname === "/lead") && request.method === "POST") {
-      return handleLeadSubmission(request, env, ctx);
-    }
-
-    if ((url.pathname === "/api/telemetry" || url.pathname === "/telemetry") && request.method === "POST") {
-      return handleTelemetry(request, env, ctx);
     }
 
     return env.ASSETS.fetch(request);

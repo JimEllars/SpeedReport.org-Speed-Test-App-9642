@@ -256,14 +256,23 @@ export async function handleLeadSubmission(request: Request, env: any, ctx: Exec
       try {
         if (env.AXIM_CORE_URL && env.AXIM_INTERNAL_KEY) {
           const url = `${env.AXIM_CORE_URL}/api/v1/leads/telemetry`;
-          await fetch(url, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Axim-Signature": env.AXIM_INTERNAL_KEY
-            },
-            body: JSON.stringify({ payload, leadId, type: "manual_lead" })
-          });
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 4000);
+          try {
+            await fetch(url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Axim-Signature": env.AXIM_INTERNAL_KEY
+              },
+              body: JSON.stringify({ payload, leadId, type: "manual_lead" }),
+              signal: controller.signal
+            });
+          } catch (e) {
+            console.error("AXiM Core Relay Error or Timeout:", e);
+          } finally {
+            clearTimeout(timeout);
+          }
         }
       } catch (err) {
         console.error("Failed to forward lead to core", err);
