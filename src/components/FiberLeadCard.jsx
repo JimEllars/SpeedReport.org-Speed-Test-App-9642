@@ -66,6 +66,10 @@ export default function FiberLeadCard({ report }) {
       });
 
       if (!response.ok) {
+        if (response.status === 429) {
+          setError('Too many requests. Please try again later.');
+          return;
+        }
         throw new Error('Failed to submit');
       }
 
