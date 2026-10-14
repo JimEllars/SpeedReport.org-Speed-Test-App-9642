@@ -2,8 +2,11 @@ import { API_BASE } from '../common/testConstants';
 
 const round = (value, digits = 1) => Number(value.toFixed(digits));
 
-const endpoint = (path, params = '') =>
-  `${API_BASE}${path}${params}${params ? '&' : '?'}t=${Date.now()}`;
+const endpoint = (path, params = '') => {
+  const sep = params ? '&' : '?';
+  const nonce = Math.random().toString(36).substring(2, 8);
+  return `${API_BASE}${path}${params}${sep}t=${Date.now()}&n=${nonce}`;
+};
 
 function requestOptions(signal) {
   return {
