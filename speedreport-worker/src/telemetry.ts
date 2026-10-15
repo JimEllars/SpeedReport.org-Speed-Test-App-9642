@@ -129,15 +129,20 @@ export async function handleTelemetry(request: Request, env: any, ctx: Execution
 
             if (shouldForwardLead && env.AXIM_CORE_URL && env.AXIM_INTERNAL_KEY) {
               const url = `${env.AXIM_CORE_URL}/api/v1/leads/telemetry`;
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 4000);
               fetch(url, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
                   "X-Axim-Signature": env.AXIM_INTERNAL_KEY
                 },
-                body: JSON.stringify({ payload, evaluation: prospectEval })
+                body: JSON.stringify({ payload, evaluation: prospectEval }),
+                signal: controller.signal
               }).catch(err => {
-                console.error("Failed to forward lead to AXIM Core", err);
+                console.error("Failed to forward lead to AXIM Core or Timeout", err);
+              }).finally(() => {
+                clearTimeout(timeout);
               });
             }
 
