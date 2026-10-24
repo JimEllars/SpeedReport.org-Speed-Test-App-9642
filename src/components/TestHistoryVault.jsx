@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import SafeIcon from '../common/SafeIcon';
 import { downloadHistoryCsv } from '../utils/reportActions';
 import './TestHistoryVault.css';
+import { downloadReport } from '../utils/pdfReportGenerator';
 
 const {
   FiArchive,
@@ -12,7 +13,8 @@ const {
   FiTrendingUp,
   FiBookmark,
   FiUploadCloud,
-  FiMapPin
+  FiMapPin,
+  FiFileText
 } = FiIcons;
 
 function getBarHeight(value, maxVal) {
@@ -200,6 +202,14 @@ export default function TestHistoryVault({ history, onClear, onSelect, onToggleP
                     style={{ color: test.pinned ? '#f5bc6e' : '#719bea' }}
                   >
                     <SafeIcon icon={FiBookmark} />
+                  </button>
+                  <button
+                    className="history-view"
+                    onClick={(e) => { e.stopPropagation(); downloadReport(test, { mode: 'SLA_DISPUTE_DOSSIER' }); }}
+                    aria-label={`Export Dispute Dossier for ${test.id}`}
+                    title="Export SLA Dispute Dossier"
+                  >
+                    <SafeIcon icon={FiFileText}/>
                   </button>
                   <button
                     className="history-view"

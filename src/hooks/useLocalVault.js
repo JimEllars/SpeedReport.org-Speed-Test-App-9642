@@ -163,6 +163,21 @@ export function useLocalVault() {
     });
   }, []);
 
+
+  const updateLocationTag = useCallback((reportId, locationTag) => {
+    setHistory((current) => {
+      const next = current.map((item) => {
+        if (item.id === reportId) {
+          return { ...item, locationTag };
+        }
+        return item;
+      });
+      const finalData = safeSetStorage(STORAGE_KEY, next, current);
+      setStorageUsagePercent(Math.round((finalData.length / MAX_HISTORY) * 100));
+      return finalData;
+    });
+  }, []);
+
   const togglePin = useCallback((reportId) => {
     setHistory((current) => {
       const next = current.map((item) => {
@@ -206,6 +221,7 @@ export function useLocalVault() {
     exportVaultToJson,
     importVaultFromJson,
     getUniqueLocations,
-    filterByLocation
+    filterByLocation,
+    updateLocationTag
   };
 }

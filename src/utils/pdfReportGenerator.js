@@ -45,15 +45,22 @@ export async function downloadReport(report, options = {}) {
     color: blue
   });
 
-  page.drawText('Network Verification Certificate', {
+  const reportTitle = options?.mode === "SLA_DISPUTE_DOSSIER"
+    ? "OFFICIAL ISP SERVICE LEVEL AGREEMENT (SLA) DISPUTE DOSSIER"
+    : "Network Verification Certificate";
+
+  page.drawText(reportTitle, {
     x: 42,
     y: 704,
-    size: 25,
+    size: options?.mode === "SLA_DISPUTE_DOSSIER" ? 18 : 25,
     font: bold,
     color: rgb(1, 1, 1)
   });
 
-  page.drawText(`Certificate ${report.id}`, {
+  const subHeader = options?.mode === "SLA_DISPUTE_DOSSIER"
+    ? "Evidentiary Performance Audit for Formal Carrier Ticket Escalation"
+    : `Certificate ${report.id}`;
+  page.drawText(subHeader, {
     x: 42,
     y: 680,
     size: 10,
