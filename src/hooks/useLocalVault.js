@@ -183,6 +183,19 @@ export function useLocalVault() {
     setStorageUsagePercent(0);
   }, []);
 
+  const getUniqueLocations = useCallback(() => {
+    const locations = new Set();
+    history.forEach(item => {
+      if (item.locationTag) locations.add(item.locationTag);
+    });
+    return Array.from(locations).sort();
+  }, [history]);
+
+  const filterByLocation = useCallback((location) => {
+    if (!location) return history;
+    return history.filter(item => item.locationTag === location);
+  }, [history]);
+
   return {
     history,
     latestReport: history[0] || null,
@@ -191,6 +204,8 @@ export function useLocalVault() {
     togglePin,
     storageUsagePercent,
     exportVaultToJson,
-    importVaultFromJson
+    importVaultFromJson,
+    getUniqueLocations,
+    filterByLocation
   };
 }
