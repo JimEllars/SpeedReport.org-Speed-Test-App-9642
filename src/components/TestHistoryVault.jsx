@@ -1,7 +1,7 @@
 import * as FiIcons from 'react-icons/fi';
+import { useState, useMemo } from 'react';
 import SafeIcon from '../common/SafeIcon';
 import { downloadHistoryCsv } from '../utils/reportActions';
-import { downloadJsonReport } from '../utils/reportActions';
 import './TestHistoryVault.css';
 
 const {
@@ -12,7 +12,7 @@ const {
   FiTrendingUp,
   FiBookmark,
   FiUploadCloud,
-  FiX
+  FiMapPin
 } = FiIcons;
 
 function getBarHeight(value, maxVal) {
@@ -27,40 +27,55 @@ function formatDate(timestamp) {
   });
 }
 
-export default function TestHistoryVault({ history, onClear, onSelect, onTogglePin, onExportVault, onImportVault, onClose }) {
-    const maxVal = Math.max(
-    ...history.map((test) => test.metrics.download),
+export default function TestHistoryVault({ history, onClear, onSelect, onTogglePin, onExportVault, onImportVault }) {
+  const [locationFilter, setLocationFilter] = useState('');
+
+  const uniqueLocations = useMemo(() => {
+    const locs = new Set();
+    history.forEach(item => {
+      if (item.locationTag) locs.add(item.locationTag);
+    });
+    return Array.from(locs).sort();
+  }, [history]);
+
+  const filteredHistory = useMemo(() => {
+    if (!locationFilter) return history;
+    return history.filter(item => item.locationTag === locationFilter);
+  }, [history, locationFilter]);
+
+  const maxVal = Math.max(
+    ...filteredHistory.map((test) => test.metrics.download),
     1
   );
 
-
-  const exportHistoryJson = () => {
-    try {
-      const content = JSON.stringify(history, null, 2);
-      const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `SpeedReport-history-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch {
-      // Browser download permissions can block this action.
-    }
-  };
-
   const exportHistory = () => {
     try {
-      downloadHistoryCsv(history);
+      downloadHistoryCsv(filteredHistory);
     } catch {
       // Browser download permissions can block this action.
     }
   };
 
-  return (
+  const getBranchHealth = () => {
+    if (!locationFilter) return null;
+    const count = filteredHistory.length;
+    if (count === 0) return null;
 
-<section className="panel history-panel">
+    let breaches = 0;
+    filteredHistory.forEach(h => {
+       if (h.slaStatus === 'CONTRACTUAL_BREACH') breaches++;
+    });
+
+    if (breaches === 0) {
+      return `${locationFilter}: ${count} tests, 100% Compliant`;
+    }
+    return `${locationFilter}: ${count} tests, ${breaches} Breaches`;
+  };
+
+  const branchHealth = getBranchHealth();
+
+  return (
+    <section className="panel history-panel">
       <div className="panel-heading">
         <div>
           <span className="eyebrow">Stored on this device</span>
@@ -69,6 +84,22 @@ export default function TestHistoryVault({ history, onClear, onSelect, onToggleP
 
         {history.length > 0 && (
           <div className="history-actions">
+            {uniqueLocations.length > 0 && (
+              <div style={{ marginRight: '1rem', display: 'flex', alignItems: 'center' }}>
+                <SafeIcon icon={FiMapPin} style={{ marginRight: '0.25rem', color: '#94a3b8' }} />
+                <select
+                  value={locationFilter}
+                  onChange={(e) => setLocationFilter(e.target.value)}
+                  style={{ background: '#1e293b', color: 'white', border: '1px solid #334155', borderRadius: '4px', padding: '0.25rem 0.5rem', fontSize: '0.85rem' }}
+                >
+                  <option value="">All Locations</option>
+                  {uniqueLocations.map(loc => (
+                    <option key={loc} value={loc}>{loc}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <button className="icon-button" onClick={onExportVault}>
               <SafeIcon icon={FiDownload} />
               Export History
@@ -103,11 +134,19 @@ export default function TestHistoryVault({ history, onClear, onSelect, onToggleP
         )}
       </div>
 
-      {history.length === 0 ? (
+      {branchHealth && (
+        <div style={{ padding: '0.75rem', backgroundColor: '#1e293b', borderBottom: '1px solid #334155', fontSize: '0.9rem', color: '#cbd5e1' }}>
+          <strong>Branch Health:</strong> {branchHealth}
+        </div>
+      )}
+
+      {filteredHistory.length === 0 ? (
         <div className="empty-state" style={{ padding: '2rem', textAlign: 'center', color: '#718096' }}>
           <SafeIcon icon={FiArchive} style={{ fontSize: '2rem', marginBottom: '1rem', opacity: 0.5 }} />
-          <p>No tests recorded yet.</p>
-          <p style={{ fontSize: '0.875rem', opacity: 0.8, marginTop: '0.5rem' }}>Run your first diagnostic to start tracking performance history.</p>
+          <p>{history.length > 0 ? "No tests found for this location." : "No tests recorded yet."}</p>
+          {history.length === 0 && (
+            <p style={{ fontSize: '0.875rem', opacity: 0.8, marginTop: '0.5rem' }}>Run your first diagnostic to start tracking performance history.</p>
+          )}
         </div>
       ) : (
         <>
@@ -118,7 +157,7 @@ export default function TestHistoryVault({ history, onClear, onSelect, onToggleP
             </div>
 
             <div className="bars">
-              {history.slice(0, 10).reverse().map((test) => (
+              {filteredHistory.slice(0, 10).reverse().map((test) => (
                 <div className="bar-column" key={`bar-${test.id}`}>
                   <div
                     className="bar"
@@ -144,9 +183,12 @@ export default function TestHistoryVault({ history, onClear, onSelect, onToggleP
               <span style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>Action</span>
             </div>
 
-            {history.slice(0, 6).map((test) => (
+            {filteredHistory.slice(0, 6).map((test) => (
               <div className="history-row" key={test.id}>
-                <span title={test.id}>{formatDate(test.timestamp)}</span>
+                <span title={test.id}>
+                  {formatDate(test.timestamp)}
+                  {test.locationTag && <span style={{display: 'block', fontSize: '0.7rem', color: '#94a3b8'}}>{test.locationTag}</span>}
+                </span>
                 <strong>{test.metrics.download}</strong>
                 <strong>{test.metrics.upload}</strong>
                 <span>{test.metrics.ping} ms</span>
@@ -172,13 +214,12 @@ export default function TestHistoryVault({ history, onClear, onSelect, onToggleP
           </div>
 
           <p className="history-footnote">
-            {history.length} report{history.length === 1 ? '' : 's'} saved locally.
+            {filteredHistory.length} report{filteredHistory.length === 1 ? '' : 's'} saved locally.
             Export CSV to analyze the full device history.
           </p>
         </>
       )}
 
-</section>
-
+    </section>
   );
 }

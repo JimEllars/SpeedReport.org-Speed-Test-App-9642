@@ -129,15 +129,36 @@ export async function handleTelemetry(request: Request, env: any, ctx: Execution
 
             if (shouldForwardLead && env.AXIM_CORE_URL && env.AXIM_INTERNAL_KEY) {
               const url = `${env.AXIM_CORE_URL}/api/v1/leads/telemetry`;
+              const rawBody = JSON.stringify({ payload, evaluation: prospectEval });
+              const enc = new TextEncoder();
+              const key = await crypto.subtle.importKey(
+                "raw",
+                enc.encode(env.AXIM_INTERNAL_KEY),
+                { name: "HMAC", hash: "SHA-256" },
+                false,
+                ["sign"]
+              );
+              const sigBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(rawBody));
+              const signatureHex = Array.from(new Uint8Array(sigBuffer))
+                .map(b => b.toString(16).padStart(2, "0"))
+                .join("");
+
+              const controller = new AbortController();
+              const timeout = setTimeout(() => controller.abort(), 5000);
+
               fetch(url, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  "X-Axim-Signature": env.AXIM_INTERNAL_KEY
+                  "X-Axim-Signature": signatureHex,
+                  "X-Axim-Timestamp": Date.now().toString()
                 },
-                body: JSON.stringify({ payload, evaluation: prospectEval })
+                body: rawBody,
+                signal: (AbortSignal as any).timeout ? (AbortSignal as any).timeout(5000) : controller.signal
               }).catch(err => {
                 console.error("Failed to forward lead to AXIM Core", err);
+              }).finally(() => {
+                clearTimeout(timeout);
               });
             }
 

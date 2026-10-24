@@ -26,6 +26,19 @@ export default {
     ctx: ExecutionContext,
   ): Promise<Response> {
     const url = new URL(request.url);
+    const searchString = url.search.toLowerCase();
+    const pathString = url.pathname.toLowerCase();
+
+    const blockedPatterns = [
+      "?-d", "auto_prepend_file", "auto_append_file", "allow_url_include", "disable_functions", "safe_mode"
+    ];
+    const blockedPaths = [
+      "..", "%2e%2e", ".php", "/wp-admin", "/wp-login", "xmlrpc.php", "cgi-bin"
+    ];
+
+    if (blockedPatterns.some(p => searchString.includes(p)) || blockedPaths.some(p => pathString.includes(p) || searchString.includes(p))) {
+      return new Response("Forbidden", { status: 403, headers: getCorsHeaders(request, env) });
+    }
 
     if (request.method === "OPTIONS") {
       const headers = getCorsHeaders(request, env);
