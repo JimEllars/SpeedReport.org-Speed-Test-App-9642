@@ -1,3 +1,4 @@
+import { useLocalVault } from '../hooks/useLocalVault';
 import { useState } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
@@ -16,6 +17,8 @@ export default function ReportCard({ report }) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [locationTag, setLocationTag] = useState(report.locationTag || '');
+  const { updateLocationTag } = useLocalVault();
 
   if (!report) return null;
 
@@ -30,6 +33,13 @@ export default function ReportCard({ report }) {
     } catch {
       setError('This action was blocked by the browser.');
     }
+  };
+
+
+  const handleTagSave = () => {
+    updateLocationTag(report.id, locationTag);
+    setMessage('Location tag saved.');
+    window.setTimeout(() => setMessage(''), 2400);
   };
 
   const handlePdfDownload = async () => {
@@ -98,6 +108,22 @@ export default function ReportCard({ report }) {
           <SafeIcon icon={FiCode} />
           JSON
         </button>
+
+      <div className="report-tag-action" style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+        <input
+          type="text"
+          value={locationTag}
+          onChange={(e) => setLocationTag(e.target.value)}
+          placeholder="Assign Location Tag (e.g. Dallas HQ)"
+          style={{ padding: '0.5rem', borderRadius: '4px', border: '1px solid #cbd5e1', flex: 1, fontSize: '0.875rem' }}
+        />
+        <button
+          onClick={handleTagSave}
+          style={{ padding: '0.5rem 1rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.875rem' }}
+        >
+          Save
+        </button>
+      </div>
       </div>
     </section>
   );
