@@ -29,8 +29,10 @@ export function evaluateSlaCompliance(metrics, selectedTier, subscribedPlan) {
   const planDownload = parseFloat(subscribedPlan.split('/')[0]);
   const planUpload = parseFloat(subscribedPlan.split('/')[1]);
 
-  const downloadPct = download / planDownload;
-  const uploadPct = upload / planUpload;
+  const effectiveDownload = planDownload * 0.94;
+  const effectiveUpload = planUpload * 0.94;
+  const downloadPct = Math.min((download / effectiveDownload), 1);
+  const uploadPct = Math.min((upload / effectiveUpload), 1);
 
   const violations = [];
   const warnings = [];

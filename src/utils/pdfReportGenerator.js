@@ -13,7 +13,7 @@ export async function generateReportFingerprint(report) {
   return `SHA256-${hashHex.substring(0, 16).toUpperCase()}`;
 }
 
-export async function downloadReport(report) {
+export async function downloadReport(report, options = {}) {
   const fingerprint = await generateReportFingerprint(report);
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([612, 792]);
@@ -184,7 +184,7 @@ export async function downloadReport(report) {
   );
 
   page.drawText(
-    `Digital Fingerprint: ${fingerprint}`,
+    `Audit Fingerprint: ${fingerprint}`,
     {
       x: 42,
       y: 36,
@@ -193,6 +193,44 @@ export async function downloadReport(report) {
       color: muted
     }
   );
+
+
+  if (options.mode === "SLA_DISPUTE_DOSSIER" && report.sla && report.sla.status) {
+    let currentY = 175; // above the verification note
+    const slaStatus = report.sla.status;
+    const violations = report.sla.violations || [];
+
+    page.drawText('Contractual Violation Notice', {
+      x: 42,
+      y: currentY,
+      size: 11,
+      font: bold,
+      color: slaStatus === 'CONTRACTUAL_BREACH' ? rgb(0.9, 0.2, 0.2) : (slaStatus === 'COMPLIANT' ? rgb(0.1, 0.7, 0.4) : rgb(0.9, 0.6, 0.1))
+    });
+
+    currentY -= 15;
+
+    if (violations.length > 0) {
+      violations.forEach((violation) => {
+        page.drawText(`• ${violation}`, {
+          x: 42,
+          y: currentY,
+          size: 9,
+          font: regular,
+          color: navy
+        });
+        currentY -= 12;
+      });
+    } else {
+        page.drawText('• No contractual SLA breaches detected.', {
+          x: 42,
+          y: currentY,
+          size: 9,
+          font: regular,
+          color: navy
+        });
+    }
+  }
 
   const shareUrl = createReportShareUrl(report);
   const qrDataUrl = await QRCode.toDataURL(shareUrl, { width: 100, margin: 0, scale: 2 });
