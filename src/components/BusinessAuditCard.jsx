@@ -4,6 +4,7 @@ import SafeIcon from '../common/SafeIcon';
 import { formatDuration, getReadiness } from '../utils/readiness';
 import { sendAnonymousTelemetry } from '../utils/telemetry';
 import { evaluateSlaCompliance } from '../utils/slaEngine';
+import { downloadReport } from '../utils/pdfReportGenerator';
 
 const { FiPhoneCall, FiVideo, FiCloud, FiUsers, FiCheckCircle, FiFileText, FiShield, FiAlertTriangle, FiXCircle } = FiIcons;
 
@@ -16,6 +17,31 @@ export default function BusinessAuditCard({ metrics, complete, reportId }) {
   const [selectedTier, setSelectedTier] = useState('Tier 1: Dedicated Internet Access (DIA)');
   const [subscribedPlan, setSubscribedPlan] = useState('1000/1000');
   const [customPlan, setCustomPlan] = useState('');
+
+  const [isGeneratingDossier, setIsGeneratingDossier] = useState(false);
+
+  const handleGenerateDossier = async () => {
+    if (!complete || !slaResult) return;
+    setIsGeneratingDossier(true);
+    try {
+      const mockReport = {
+        id: reportId || `SLA-${Date.now()}`,
+        timestamp: Date.now(),
+        metrics: metrics,
+        meta: {}, // Need meta if available, but mock works for now
+        sla: {
+          status: slaResult.status,
+          violations: slaResult.violations
+        }
+      };
+      await downloadReport(mockReport, { mode: "SLA_DISPUTE_DOSSIER" });
+    } catch (e) {
+      console.error('Failed to generate PDF:', e);
+      alert('Failed to generate PDF');
+    } finally {
+      setIsGeneratingDossier(false);
+    }
+  };
 
   const handleRequestAudit = () => {
     setRequested(true);
@@ -178,6 +204,29 @@ export default function BusinessAuditCard({ metrics, complete, reportId }) {
                 </div>
               )}
 
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                <button
+                  onClick={handleGenerateDossier}
+                  disabled={isGeneratingDossier}
+                  style={{
+                    backgroundColor: '#1e293b',
+                    border: '1px solid #334155',
+                    color: '#e2e8f0',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '4px',
+                    fontSize: '0.85rem',
+                    cursor: isGeneratingDossier ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem'
+                  }}
+                  onMouseOver={(e) => !isGeneratingDossier && (e.currentTarget.style.backgroundColor = '#334155')}
+                  onMouseOut={(e) => !isGeneratingDossier && (e.currentTarget.style.backgroundColor = '#1e293b')}
+                >
+                  <SafeIcon icon={FiFileText} />
+                  {isGeneratingDossier ? 'Generating...' : 'Export SLA Dispute Dossier (PDF)'}
+                </button>
+              </div>
               <table style={{ width: '100%', fontSize: '0.85rem', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #334155', color: '#94a3b8' }}>

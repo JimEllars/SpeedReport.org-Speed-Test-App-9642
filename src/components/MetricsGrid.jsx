@@ -11,25 +11,30 @@ const {
   FiWifi
 } = FiIcons;
 
+const formatMetric = (val) => {
+  const num = Number(val);
+  return (isNaN(num) || val === null || val === undefined) ? '0.0' : num.toFixed(1);
+};
+
 export default function MetricsGrid({ metrics }) {
   const readiness = getReadiness(metrics);
   const status = readiness.grade;
 
   const coreItems = [
-    ['Download', (Number(metrics.download) || 0).toFixed(1), 'Mbps', FiDownload],
-    ['Upload', (Number(metrics.upload) || 0).toFixed(1), 'Mbps', FiUpload],
-    ['Latency', (Number(metrics.loadedPing || metrics.ping) || 0).toFixed(1), 'ms', FiClock],
+    ['Download', formatMetric(metrics.download), 'Mbps', FiDownload],
+    ['Upload', formatMetric(metrics.upload), 'Mbps', FiUpload],
+    ['Latency', formatMetric(metrics.loadedPing || metrics.ping), 'ms', FiClock],
   ];
 
   const secondaryItems = [
-    ['Jitter', (Number(metrics.jitter) || 0).toFixed(1), 'ms variance', FiActivity],
+    ['Jitter', formatMetric(metrics.jitter), 'ms variance', FiActivity],
     [
       'Bufferbloat',
       metrics.bufferbloat,
-      metrics.loadedPing ? `${(Number(metrics.loadedPing) || 0).toFixed(1)} ms loaded` : 'grade',
+      metrics.loadedPing ? `${formatMetric(metrics.loadedPing)} ms loaded` : 'grade',
       FiZap
     ],
-    ['Packet loss', (Number(metrics.loss) || 0).toFixed(1), '%', FiWifi]
+    ['Packet loss', formatMetric(metrics.loss), '%', FiWifi]
   ];
 
   return (
