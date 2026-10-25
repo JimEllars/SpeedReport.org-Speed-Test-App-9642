@@ -265,10 +265,10 @@ export async function handleLeadSubmission(request: Request, env: any, ctx: Exec
       const key = `rate_limit:lead:${clientIp}`;
       const current = await env.PROSPECT_STORE.get(key);
       const count = current ? parseInt(current, 10) : 0;
-      if (count >= 5) {
+      if (count >= 30) {
         return errorJson("Rate limit exceeded", "rate_limit", 429, request, env);
       }
-      await env.PROSPECT_STORE.put(key, (count + 1).toString(), { expirationTtl: 3600 });
+      await env.PROSPECT_STORE.put(key, (count + 1).toString(), { expirationTtl: 1800 });
     }
 
     const leadId = crypto.randomUUID();
