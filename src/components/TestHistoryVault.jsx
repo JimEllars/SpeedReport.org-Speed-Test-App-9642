@@ -77,7 +77,7 @@ export default function TestHistoryVault({ history, onClear, onSelect, onToggleP
   const branchHealth = getBranchHealth();
 
   return (
-    <section className="panel history-panel">
+    <section className="panel history-panel h-full flex flex-col">
       <div className="panel-heading">
         <div>
           <span className="eyebrow">Stored on this device</span>

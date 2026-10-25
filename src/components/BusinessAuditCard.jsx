@@ -70,7 +70,7 @@ export default function BusinessAuditCard({ metrics, complete, reportId }) {
   }
 
   return (
-    <section className="panel audit-panel p-4 sm:p-6" style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+    <section className="panel audit-panel p-4 sm:p-6 h-full flex flex-col" style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div>
         <div className="panel-heading flex justify-between items-start mb-4">
           <div><span className="eyebrow">Operational assessment</span><h2>Business readiness</h2></div>
