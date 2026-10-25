@@ -277,6 +277,20 @@ export async function handleLeadSubmission(request: Request, env: any, ctx: Exec
       try {
         if (env.AXIM_CORE_URL && env.AXIM_INTERNAL_KEY) {
           const url = `${env.AXIM_CORE_URL}/api/v1/leads/telemetry`;
+          const rawBody = JSON.stringify({ payload, leadId, type: "manual_lead" });
+          const enc = new TextEncoder();
+          const key = await crypto.subtle.importKey(
+            "raw",
+            enc.encode(env.AXIM_INTERNAL_KEY),
+            { name: "HMAC", hash: "SHA-256" },
+            false,
+            ["sign"]
+          );
+          const sigBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(rawBody));
+          const signatureHex = Array.from(new Uint8Array(sigBuffer))
+            .map(b => b.toString(16).padStart(2, "0"))
+            .join("");
+
           const controller = new AbortController();
           const timeout = setTimeout(() => controller.abort(), 4000);
           try {
@@ -284,9 +298,10 @@ export async function handleLeadSubmission(request: Request, env: any, ctx: Exec
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "X-Axim-Signature": env.AXIM_INTERNAL_KEY
+                "X-Axim-Signature": signatureHex,
+                "X-Axim-Timestamp": Date.now().toString()
               },
-              body: JSON.stringify({ payload, leadId, type: "manual_lead" }),
+              body: rawBody,
               signal: controller.signal
             });
           } catch (e) {

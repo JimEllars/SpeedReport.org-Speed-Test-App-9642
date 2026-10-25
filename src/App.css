@@ -556,6 +556,7 @@ main {
   grid-template-columns: 1fr 1fr;
   gap: 24px;
   margin-top: 18px;
+  align-items: stretch;
 }
 
 .grade {
