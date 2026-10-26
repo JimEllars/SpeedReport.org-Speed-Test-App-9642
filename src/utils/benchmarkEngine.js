@@ -319,7 +319,7 @@ export async function measureDownload(onProgress = () => {}, signal) {
       timeoutPromise
     ]);
   } catch (error) {
-    if (error.name === 'AbortError') throw error;
+    if (error.name === 'AbortError') return;
     // Ignore Phase timeout error to gracefully finish the test phase
   } finally {
     phaseFinished = true;
@@ -484,7 +484,7 @@ export async function measureUpload(onProgress = () => {}, signal) {
       timeoutPromise
     ]);
   } catch (error) {
-    if (error.name === 'AbortError') throw error;
+    if (error.name === 'AbortError') return;
     // Ignore Phase timeout error to gracefully finish the test phase
   } finally {
     phaseFinished = true;
