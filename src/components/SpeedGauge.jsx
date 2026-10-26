@@ -147,7 +147,15 @@ export default function SpeedGauge({
         </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none" style={{ fontVariantNumeric: 'tabular-nums', transform: 'translateZ(0)', paddingTop: '20px' }} aria-hidden="true">
-          <strong className={`${value.toFixed(1).length > 5 ? 'text-3xl xs:text-4xl sm:text-5xl' : 'text-4xl xs:text-5xl sm:text-6xl'} font-black tracking-tight text-white font-mono`}>{value.toFixed(1)}</strong>
+                    {(() => {
+            const displayString = value.toFixed(1);
+            const isWide = displayString.length >= 6;
+            return (
+              <strong className={`${isWide ? 'text-4xl xs:text-5xl sm:text-5xl lg:text-6xl' : 'text-5xl xs:text-6xl sm:text-6xl lg:text-7xl'} font-black tracking-tight text-white font-mono`}>
+                {displayString}
+              </strong>
+            );
+          })()}
           <span className="text-xs xs:text-sm font-semibold text-cyan-400 uppercase tracking-widest mt-1">{formatSpeed(value).split(' ').slice(1).join(' ') || 'Mbps'}</span>
           <small className="mt-1 opacity-80">{state === STATES.UPLOAD ? 'UPLOAD' : 'DOWNLOAD'}</small>
         </div>
