@@ -17,7 +17,7 @@ export default function ReportCard({ report }) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [locationTag, setLocationTag] = useState(report.locationTag || '');
+  const [locationTag, setLocationTag] = useState(report?.locationTag || '');
   const { updateLocationTag } = useLocalVault();
 
   if (!report) return null;
