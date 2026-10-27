@@ -22,7 +22,8 @@ export default function FiberLeadCard({ report }) {
     if (!email && !postalCode) return;
 
     // Inline validation
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+    const cleanEmail = email.trim();
+    if (cleanEmail && !/^\S+@\S+\.\S+$/.test(cleanEmail)) {
       setError('Please enter a valid email address.');
       return;
     }
@@ -49,7 +50,7 @@ export default function FiberLeadCard({ report }) {
         isp: report.meta?.isp || '',
         colo: report.meta?.colo || '',
         leadInfo: {
-          email,
+          email: cleanEmail,
           postalCode,
           requestedFiberCheck: true
         }
