@@ -50,7 +50,7 @@ export async function sendTelemetryEvent(endpointUrl, payload) {
     });
     return res.ok;
   } catch (err) {
-    console.debug('Telemetry delivery skipped:', err);
+    // console.debug('Telemetry delivery skipped:', err);
     return false;
   }
 }
@@ -87,7 +87,7 @@ export async function flushQueue(retryCount = 0) {
       }
     }
   } catch (e) {
-    console.debug('Telemetry delivery skipped:', e);
+    // console.debug('Telemetry delivery skipped:', e);
     // If network fails, re-queue the items
     const currentQueue = getQueue();
     // Prepend to maintain order or append, append is fine
