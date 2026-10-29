@@ -1,6 +1,6 @@
 # SpeedReport.org
 
-SpeedReport.org is a React single-page application and Cloudflare Worker that
+SpeedReport.org is a React single-page application (PWA) and Cloudflare Worker API Backend that
 measures download speed, upload speed, latency, jitter, packet loss, and
 loaded latency. Test history remains in the visitor's browser.
 
@@ -8,19 +8,24 @@ loaded latency. Test history remains in the visitor's browser.
 
 ```sh
 npm install
-npm run dev
+npm run dev &
 ```
 
 The speed test needs the edge Worker. In a second terminal:
 
 ```sh
-npm --prefix speedreport-worker install
-npm --prefix speedreport-worker run dev
+cd speedreport-worker && npm install && npm run dev &
 ```
 
 Set `VITE_SPEED_TEST_WORKER_URL` to the Worker URL only when the frontend and
 Worker use different origins. The production deployment uses same-origin
 `/api/*` endpoints, so no public API URL or CORS configuration is required.
+
+## Cloudflare Dashboard Configuration
+The following environment variable bindings are required for `wrangler.toml` / Cloudflare Dashboard:
+- `AXIM_CORE_URL`
+- `AXIM_INTERNAL_KEY`
+- KV Binding: `PROSPECT_STORE`
 
 ## Deploying to Cloudflare
 
