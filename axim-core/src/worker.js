@@ -6,17 +6,21 @@ const json = (status, body) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 async function upsertLead(env, row) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/leads?on_conflict=test_id`, {
+  const key = (env.SUPABASE_SERVICE_ROLE_KEY || env.SERVICE_ROLE_KEY || '').trim();
+  const base = new URL((env.SUPABASE_URL || '').trim()).origin;
+  const headers = {
+    apikey: key,
+    'Content-Type': 'application/json',
+    Prefer: 'resolution=merge-duplicates,return=minimal',
+  };
+  // Legacy service_role keys are JWTs; new sb_secret_ keys must not be sent as Bearer.
+  if (key.startsWith('eyJ')) headers.Authorization = `Bearer ${key}`;
+  const res = await fetch(`${base}/rest/v1/leads?on_conflict=test_id`, {
     method: 'POST',
-    headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      'Content-Type': 'application/json',
-      Prefer: 'resolution=merge-duplicates,return=minimal',
-    },
+    headers,
     body: JSON.stringify(row),
   });
-  if (!res.ok) throw new Error(`supabase ${res.status}`);
+  if (!res.ok) throw new Error(`supabase ${res.status}: ${(await res.text()).slice(0, 200)}`);
 }
 
 export default {
