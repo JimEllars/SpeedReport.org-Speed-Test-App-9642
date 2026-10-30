@@ -8,6 +8,16 @@ Ingests HMAC-authenticated leads from satellite apps (SpeedReport.org) into Supa
    (Node 20.6+: `node --env-file=.env src/server.js`).
 3. Deploy anywhere that runs Node (Fly.io, Railway, Render, a VPS) behind HTTPS.
 
+## Deploy on Cloudflare Workers (gives you the AXIM_CORE_URL)
+```bash
+cd axim-core && npm install
+npx wrangler secret put AXIM_INTERNAL_KEY            # same value as the SpeedReport Worker
+npx wrangler secret put SUPABASE_URL
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+npm run deploy
+```
+Wrangler prints `https://axim-core.<your-subdomain>.workers.dev` — that is `AXIM_CORE_URL`.
+
 ## Endpoint
 `POST /api/v1/leads/telemetry` — body is the exact JSON the Worker signs; header
 `X-Axim-Signature` = hex HMAC-SHA256(body, `AXIM_INTERNAL_KEY`). Invalid/missing → `401`.
