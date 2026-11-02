@@ -105,6 +105,173 @@ export function evaluateFiberProspect(payload: any): FiberProspectEvaluation {
   };
 }
 
+const DLQ_PREFIX = "dlq:lead:";
+const DLQ_TTL_SECONDS = 86_400; // 24h, per Core ingress contract
+const DLQ_REPLAY_LIMIT = 10;
+const CORE_TIMEOUT_MS = 5_000;
+
+interface DispatchResult {
+  ok: boolean;
+  status: number;
+  reason?: string;
+}
+
+function toHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * HMAC-SHA256 over the exact raw body bytes we are about to transmit, hex
+ * encoded. Core recomputes this over the received bytes, so the signed string
+ * and the transmitted string must be the same serialization.
+ */
+async function signBody(secret: string, rawBody: string): Promise<string> {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, enc.encode(rawBody));
+  return toHex(signature);
+}
+
+function coreTelemetryUrl(env: any): string | null {
+  if (!env.AXIM_CORE_URL || !env.AXIM_INTERNAL_KEY) return null;
+  return `${env.AXIM_CORE_URL}/api/v1/leads/telemetry`;
+}
+
+/**
+ * Signed dispatch to Core. Returns a result instead of throwing so callers can
+ * decide whether the payload belongs in the dead-letter queue.
+ */
+async function dispatchToCore(env: any, rawBody: string): Promise<DispatchResult> {
+  const url = coreTelemetryUrl(env);
+  if (!url) return { ok: false, status: 0, reason: "core_not_configured" };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CORE_TIMEOUT_MS);
+
+  try {
+    const signature = await signBody(env.AXIM_INTERNAL_KEY, rawBody);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Axim-Signature": signature,
+        "X-Axim-Timestamp": Date.now().toString(),
+      },
+      body: rawBody,
+      signal: controller.signal,
+    });
+
+    if (response.ok) return { ok: true, status: response.status };
+    return { ok: false, status: response.status, reason: `http_${response.status}` };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      reason: error instanceof Error ? error.message : String(error),
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/**
+ * Park an undeliverable lead dispatch in PROSPECT_STORE. Keyed per test so a
+ * retried test overwrites rather than duplicates; the 86400s TTL keeps the
+ * namespace bounded even if Core stays unreachable.
+ */
+async function bufferFailedDispatch(
+  env: any,
+  testId: string,
+  rawBody: string,
+  reason: string,
+): Promise<void> {
+  if (!env.PROSPECT_STORE) {
+    // Surfaces a misconfigured binding instead of silently dropping leads.
+    console.error(
+      JSON.stringify({ event: "telemetry.dlq_unbound", testId, reason }),
+    );
+    return;
+  }
+
+  const key = `${DLQ_PREFIX}${testId}`;
+  try {
+    await env.PROSPECT_STORE.put(
+      key,
+      JSON.stringify({ rawBody, reason, bufferedAt: new Date().toISOString() }),
+      { expirationTtl: DLQ_TTL_SECONDS },
+    );
+    console.warn(JSON.stringify({ event: "telemetry.dlq_buffered", key, reason }));
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "telemetry.dlq_write_failed",
+        key,
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  }
+}
+
+/**
+ * Best-effort drain of buffered dispatches. Runs on the request path (inside
+ * waitUntil) so a recovered Core connection clears the backlog without a
+ * separate cron. Stops at the first failure to avoid hammering a struggling
+ * Core; the TTL expires anything that never gets through.
+ */
+async function replayDlq(env: any): Promise<void> {
+  if (!env.PROSPECT_STORE || typeof env.PROSPECT_STORE.list !== "function") return;
+  if (!coreTelemetryUrl(env)) return;
+
+  try {
+    const listing = await env.PROSPECT_STORE.list({
+      prefix: DLQ_PREFIX,
+      limit: DLQ_REPLAY_LIMIT,
+    });
+
+    for (const entry of listing?.keys ?? []) {
+      const key = typeof entry === "string" ? entry : entry?.name;
+      if (!key) continue;
+
+      const stored = await env.PROSPECT_STORE.get(key);
+      if (!stored) continue;
+
+      let rawBody: string | null = null;
+      try {
+        rawBody = JSON.parse(stored)?.rawBody ?? null;
+      } catch {
+        rawBody = null;
+      }
+
+      if (!rawBody) {
+        // Unparseable entry can never succeed; drop it rather than retrying forever.
+        await env.PROSPECT_STORE.delete(key);
+        continue;
+      }
+
+      const result = await dispatchToCore(env, rawBody);
+      if (!result.ok) break;
+
+      await env.PROSPECT_STORE.delete(key);
+      console.log(JSON.stringify({ event: "telemetry.dlq_replayed", key }));
+    }
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "telemetry.dlq_replay_failed",
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
+  }
+}
+
 export async function handleTelemetry(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
   const correlationId = request.headers.get("CF-Ray") || crypto.randomUUID();
 
@@ -119,6 +286,9 @@ export async function handleTelemetry(request: Request, env: any, ctx: Execution
     ctx.waitUntil(
       (async () => {
         try {
+          // Drain anything parked by an earlier failed dispatch before adding more.
+          await replayDlq(env);
+
           for (const payload of payloads) {
             if (!payload || typeof payload !== "object") continue;
 
@@ -127,39 +297,14 @@ export async function handleTelemetry(request: Request, env: any, ctx: Execution
 
             const shouldForwardLead = prospectEval.opportunityScore >= 50 || Boolean(payload.leadInfo?.email);
 
-            if (shouldForwardLead && env.AXIM_CORE_URL && env.AXIM_INTERNAL_KEY) {
-              const url = `${env.AXIM_CORE_URL}/api/v1/leads/telemetry`;
+            if (shouldForwardLead) {
+              const testId = String(payload.testId ?? payload.sessionId ?? crypto.randomUUID());
               const rawBody = JSON.stringify({ payload, evaluation: prospectEval });
-              const enc = new TextEncoder();
-              const key = await crypto.subtle.importKey(
-                "raw",
-                enc.encode(env.AXIM_INTERNAL_KEY),
-                { name: "HMAC", hash: "SHA-256" },
-                false,
-                ["sign"]
-              );
-              const sigBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(rawBody));
-              const signatureHex = Array.from(new Uint8Array(sigBuffer))
-                .map(b => b.toString(16).padStart(2, "0"))
-                .join("");
+              const result = await dispatchToCore(env, rawBody);
 
-              const controller = new AbortController();
-              const timeout = setTimeout(() => controller.abort(), 5000);
-
-              fetch(url, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "X-Axim-Signature": signatureHex,
-                  "X-Axim-Timestamp": Date.now().toString()
-                },
-                body: rawBody,
-                signal: (AbortSignal as any).timeout ? (AbortSignal as any).timeout(5000) : controller.signal
-              }).catch(err => {
-                console.error("Failed to forward lead to AXIM Core", err);
-              }).finally(() => {
-                clearTimeout(timeout);
-              });
+              if (!result.ok) {
+                await bufferFailedDispatch(env, testId, rawBody, result.reason ?? "dispatch_failed");
+              }
             }
 
             let sessionId = payload.sessionId ?? payload.testId;
@@ -269,46 +414,26 @@ export async function handleLeadSubmission(request: Request, env: any, ctx: Exec
         return errorJson("Rate limit exceeded", "rate_limit", 429, request, env);
       }
       await env.PROSPECT_STORE.put(key, (count + 1).toString(), { expirationTtl: 1800 });
+    } else {
+      // Without the binding the limiter is a no-op; make that visible instead of
+      // quietly accepting unlimited lead submissions.
+      console.error(JSON.stringify({ event: "lead.rate_limit_unbound", clientIp }));
     }
 
     const leadId = crypto.randomUUID();
 
     ctx.waitUntil((async () => {
       try {
-        if (env.AXIM_CORE_URL && env.AXIM_INTERNAL_KEY) {
-          const url = `${env.AXIM_CORE_URL}/api/v1/leads/telemetry`;
-          const rawBody = JSON.stringify({ payload, leadId, type: "manual_lead" });
-          const enc = new TextEncoder();
-          const key = await crypto.subtle.importKey(
-            "raw",
-            enc.encode(env.AXIM_INTERNAL_KEY),
-            { name: "HMAC", hash: "SHA-256" },
-            false,
-            ["sign"]
-          );
-          const sigBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(rawBody));
-          const signatureHex = Array.from(new Uint8Array(sigBuffer))
-            .map(b => b.toString(16).padStart(2, "0"))
-            .join("");
+        const rawBody = JSON.stringify({ payload, leadId, type: "manual_lead" });
+        const result = await dispatchToCore(env, rawBody);
 
-          const controller = new AbortController();
-          const timeout = setTimeout(() => controller.abort(), 4000);
-          try {
-            await fetch(url, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Axim-Signature": signatureHex,
-                "X-Axim-Timestamp": Date.now().toString()
-              },
-              body: rawBody,
-              signal: controller.signal
-            });
-          } catch (e) {
-            console.error("AXiM Core Relay Error or Timeout:", e);
-          } finally {
-            clearTimeout(timeout);
-          }
+        if (!result.ok) {
+          await bufferFailedDispatch(
+            env,
+            String(payload.testId),
+            rawBody,
+            result.reason ?? "dispatch_failed",
+          );
         }
       } catch (err) {
         console.error("Failed to forward lead to core", err);
