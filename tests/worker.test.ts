@@ -84,3 +84,43 @@ describe('Cloudflare Worker', () => {
     expect(res.status).toBe(204);
   });
 });
+
+describe('Edge cyber defence', () => {
+  // Note: WHATWG `new URL()` resolves dot-segments itself, so a plain `/../../etc/passwd`
+  // or a single-encoded `/%2e%2e/` arrives already normalised to `/etc/passwd` and can
+  // never reach a protected path. The vectors below are the ones that survive parsing
+  // and therefore actually need screening at the edge.
+  const blocked = [
+    ['PHP CGI dash argument', 'http://localhost/?-d+allow_url_include%3don'],
+    ['auto_prepend_file injection', 'http://localhost/?x=1&auto_prepend_file=php://input'],
+    ['auto_append_file injection', 'http://localhost/index?auto_append_file=evil'],
+    ['allow_url_include flag', 'http://localhost/api/ping?allow_url_include=1'],
+    ['disable_functions override', 'http://localhost/api/ping?disable_functions=exec'],
+    ['safe_mode override', 'http://localhost/api/ping?safe_mode=off'],
+    ['double-encoded traversal', 'http://localhost/%252e%252e/%252e%252e/etc/passwd'],
+    ['traversal in query', 'http://localhost/api/meta?file=../../etc/passwd'],
+    ['php probe', 'http://localhost/wp-content/shell.php'],
+    ['wp-admin probe', 'http://localhost/wp-admin/'],
+    ['wp-login probe', 'http://localhost/wp-login.php'],
+    ['xmlrpc probe', 'http://localhost/xmlrpc.php'],
+    ['cgi-bin probe', 'http://localhost/cgi-bin/status'],
+  ] as const;
+
+  it.each(blocked)('blocks %s with 403', async (_label, url) => {
+    const res = await worker.fetch(new Request(url), mockEnv, mockCtx);
+    expect(res.status).toBe(403);
+    expect(await res.text()).toBe('Forbidden');
+  });
+
+  it('still serves legitimate API and asset traffic', async () => {
+    const health = await worker.fetch(new Request('http://localhost/health'), mockEnv, mockCtx);
+    expect(health.status).toBe(200);
+
+    const ping = await worker.fetch(new Request('http://localhost/api/ping'), mockEnv, mockCtx);
+    expect(ping.status).toBe(204);
+
+    mockEnv.ASSETS.fetch.mockResolvedValue(new Response('asset', { status: 200 }));
+    const asset = await worker.fetch(new Request('http://localhost/assets/index-BqLcMYbE.js'), mockEnv, mockCtx);
+    expect(asset.status).toBe(200);
+  });
+});

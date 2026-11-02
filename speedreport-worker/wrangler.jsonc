@@ -29,6 +29,17 @@
       "dataset": "speedreport_telemetry",
     },
   ],
+  // PROSPECT_STORE backs the satellite dead-letter queue (`dlq:lead:{testId}`,
+  // 86400s TTL) and the per-IP lead rate limiter. The binding is deliberately
+  // omitted until the namespace exists — publishing a placeholder id makes
+  // `wrangler deploy` fail. Create it once, then uncomment and paste the id:
+  //
+  //   cd speedreport-worker
+  //   npx wrangler kv namespace create PROSPECT_STORE --config wrangler.jsonc
+  //
+  // "kv_namespaces": [
+  //   { "binding": "PROSPECT_STORE", "id": "<namespace-id-from-above>" },
+  // ],
   "triggers": {
     "crons": ["0 12 * * *"],
   },

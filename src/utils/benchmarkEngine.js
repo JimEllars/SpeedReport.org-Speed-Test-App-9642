@@ -134,7 +134,16 @@ async function probeLoadedPing(signal) {
   return null;
 }
 
-// Helper to calculate rolling throughput over the last 500ms
+// Stall detection threshold. Browsers throttle background-tab timers and progress
+// events to 250-500ms granularity, and large uploads can legitimately report no
+// new bytes for several seconds. A 6000ms floor keeps slow-but-alive links from
+// being torn down mid-phase.
+const STALL_THRESHOLD_MS = 6000;
+
+// Helper to calculate rolling throughput over the last second.
+// A 200ms window was too tight for real-world B2B links: a single delayed progress
+// callback emptied the window and the gauge snapped to 0.0 Mbps. 1000ms spans
+// multiple browser throttling ticks so the live readout stays continuous.
 class ThroughputCalculator {
   constructor() {
     this.chunks = []; // { bytes: number, time: number }
@@ -143,7 +152,7 @@ class ThroughputCalculator {
     this.speedHistory = []; // Array of Mbps slices after warmup
     this.started = performance.now();
     this.warmupTime = 2000; // 2.0s warmup
-    this.windowSize = 200; // 200ms window
+    this.windowSize = 1000; // 1000ms window
     this.lastBytesTime = performance.now();
   }
 
@@ -199,7 +208,7 @@ class ThroughputCalculator {
   }
 
   checkStall() {
-    return (performance.now() - this.lastBytesTime) > 3500;
+    return (performance.now() - this.lastBytesTime) > STALL_THRESHOLD_MS;
   }
 }
 
@@ -273,6 +282,9 @@ export async function measureDownload(onProgress = () => {}, signal) {
     onProgress(round(calculator.getLiveSpeedMbps()), lastPing);
   }, 50);
 
+  // Declared before the streams start so first-completion callbacks never hit
+  // the temporal dead zone.
+  let activeStreams = 4;
   let streams = [];
 
   // Start with 2MB, ramp up to 25MB based on velocity
@@ -301,7 +313,6 @@ export async function measureDownload(onProgress = () => {}, signal) {
   }
 
   // Dynamic scaling checker
-  let activeStreams = 4;
   let scalingInterval = setInterval(() => {
     const mbps = calculator.getLiveSpeedMbps();
     if (mbps > 400 && activeStreams < 8) {
@@ -361,6 +372,30 @@ function createUploadPayload(size) {
   return payload;
 }
 
+// Progressive upload sizing. A static 8 MiB buffer made short-lived or
+// latency-bound connections spend the whole phase on a single request, and gave
+// huge links too little headroom to saturate. Each stream walks this ladder so
+// the phase produces measurable samples early and scales up as capacity allows.
+const UPLOAD_CHUNK_LADDER_BYTES = [
+  512 * 1024, // 512 KiB
+  1024 * 1024, // 1 MiB
+  2 * 1024 * 1024, // 2 MiB
+  4 * 1024 * 1024 // 4 MiB
+];
+
+// Random payloads are expensive to generate; build each ladder step once and
+// share it across every concurrent stream.
+const uploadPayloadCache = new Map();
+
+function getUploadPayload(size) {
+  const cached = uploadPayloadCache.get(size);
+  if (cached) return cached;
+
+  const payload = createUploadPayload(size);
+  uploadPayloadCache.set(size, payload);
+  return payload;
+}
+
 // We need a custom upload client to track live progress since fetch API does not support upload progress tracking
 // XMLHttpRequest supports it. Let's use XHR wrapped in a Promise.
 function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
@@ -397,7 +432,18 @@ function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
       lastLoaded = event.loaded;
     };
 
-    const onLoad = () => { cleanup(); resolve(); };
+    const onLoad = () => {
+      cleanup();
+      // XHR fires 'load' for every HTTP status, including 4xx/5xx. Without an
+      // explicit range check a rejected upload was scored as transferred bytes
+      // and inflated the throughput reading.
+      const status = xhr.status;
+      if (status >= 200 && status < 300) {
+        resolve();
+        return;
+      }
+      reject(new Error(`Upload endpoint rejected payload (HTTP ${status})`));
+    };
     const onError = () => { cleanup(); reject(new Error('Upload endpoint unavailable')); };
     const onXhrAbort = () => { cleanup(); reject(new DOMException('The diagnostic was cancelled.', 'AbortError')); };
 
@@ -451,26 +497,41 @@ export async function measureUpload(onProgress = () => {}, signal) {
     onProgress(round(calculator.getLiveSpeedMbps()), lastPing);
   }, 50);
 
-  const payload = createUploadPayload(8 * 1024 * 1024);
+  // Tracked before any stream starts so the first completion can read it.
+  let activeStreams = 4;
 
-  let streams = [];
-  const startStream = () => uploadPayloadWithProgress(payload, calculator, phaseSignal).then(() => {
-    if (!signal?.aborted && !phaseFinished) {
+  const startStream = async () => {
+    let ladderIndex = 0;
+
+    while (!signal?.aborted && !phaseFinished) {
+      const size = UPLOAD_CHUNK_LADDER_BYTES[
+        Math.min(ladderIndex, UPLOAD_CHUNK_LADDER_BYTES.length - 1)
+      ];
+
+      await uploadPayloadWithProgress(getUploadPayload(size), calculator, phaseSignal);
+
+      if (signal?.aborted || phaseFinished) return;
+
+      if (ladderIndex < UPLOAD_CHUNK_LADDER_BYTES.length - 1) {
+        ladderIndex += 1;
+      }
+
+      // Slow links do not benefit from piling on streams; shed the extra one.
       const currentMbps = calculator.getLiveSpeedMbps();
       if (currentMbps > 0 && currentMbps < 20 && activeStreams > 2) {
-         activeStreams--;
-         return;
+        activeStreams -= 1;
+        return;
       }
-      return startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); });
     }
-  });
+  };
+
+  let streams = [];
 
   // Default 4 streams
   for (let i = 0; i < 4; i++) {
     streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
   }
 
-  let activeStreams = 4;
   let scalingInterval = setInterval(() => {
     const mbps = calculator.getLiveSpeedMbps();
     if (mbps > 400 && activeStreams < 8) {

@@ -25,6 +25,29 @@ function formatSpeed(value) {
   return `${value.toFixed(1)} Mbps`;
 }
 
+// Centre-of-gauge phase readout. Each phase gets its own accent so the operator
+// can tell at a glance which leg of the diagnostic is running: emerald for
+// latency/complete, cyan for download, purple for upload.
+const PHASE_ACCENTS = {
+  emerald: '#34d399',
+  cyan: '#22d3ee',
+  purple: '#a78bfa',
+  amber: '#f5bc6e',
+  red: '#f87171'
+};
+
+const PHASE_INDICATORS = {
+  [STATES.IDLE]: { label: 'READY TO TEST', accent: PHASE_ACCENTS.cyan },
+  [STATES.PING]: { label: 'TESTING LATENCY', accent: PHASE_ACCENTS.emerald },
+  [STATES.DOWNLOAD]: { label: 'TESTING DOWNLOAD', accent: PHASE_ACCENTS.cyan },
+  [STATES.UPLOAD]: { label: 'TESTING UPLOAD', accent: PHASE_ACCENTS.purple },
+  [STATES.COMPLETE]: { label: 'TEST COMPLETE', accent: PHASE_ACCENTS.emerald },
+  [STATES.COMPLETED_PARTIAL]: { label: 'TEST COMPLETE', accent: PHASE_ACCENTS.amber },
+  [STATES.ERROR]: { label: 'TEST INTERRUPTED', accent: PHASE_ACCENTS.red }
+};
+
+const DEFAULT_INDICATOR = { label: 'READY TO TEST', accent: PHASE_ACCENTS.cyan };
+
 export default function SpeedGauge({
   state,
   metrics,
@@ -90,6 +113,8 @@ export default function SpeedGauge({
   // Calculate percentage dynamically for dynamic tiering
   const maxScaleMbps = getGaugeMaxScale(value);
   const percent = Math.min((value / maxScaleMbps) * 100, 100);
+
+  const phaseIndicator = PHASE_INDICATORS[state] || DEFAULT_INDICATOR;
 
 
   const speedPoints = samples.length
@@ -157,7 +182,13 @@ export default function SpeedGauge({
             );
           })()}
           <span className="text-xs xs:text-sm font-semibold text-cyan-400 uppercase tracking-widest mt-1">{formatSpeed(value).split(' ').slice(1).join(' ') || 'Mbps'}</span>
-          <small className="mt-1 opacity-80">{state === STATES.UPLOAD ? 'UPLOAD' : 'DOWNLOAD'}</small>
+          <small
+            className="mt-1 font-mono text-[0.62rem] xs:text-[0.68rem] font-bold uppercase tracking-[0.2em] transition-colors duration-300"
+            style={{ color: phaseIndicator.accent }}
+            data-phase={state}
+          >
+            {phaseIndicator.label}
+          </small>
         </div>
       </div>
 

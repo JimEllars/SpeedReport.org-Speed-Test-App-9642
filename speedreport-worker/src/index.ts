@@ -8,15 +8,85 @@ import { handleTelemetry, handleLeadSubmission } from "./telemetry";
 interface WorkerEnv {
   ASSETS: Fetcher;
   TELEMETRY: AnalyticsEngineDataset;
+  PROSPECT_STORE?: KVNamespace;
   ADMIN_SECRET?: string;
   RESEND_API_KEY?: string;
   REPORT_RECIPIENT_TO?: string;
   REPORT_RECIPIENT_BCC?: string;
+  AXIM_CORE_URL?: string;
+  AXIM_INTERNAL_KEY?: string;
+  ALLOWED_ORIGINS?: string;
 }
 
 
 function isAuthorized(request: Request, adminSecret?: string): boolean {
   return Boolean(adminSecret) && request.headers.get("Authorization") === `Bearer ${adminSecret}`;
+}
+
+/**
+ * Percent-decode up to twice, so double-encoded payloads (`%252e%252e`) cannot
+ * slip past a single-pass check. Returns lowercase for case-insensitive matching.
+ */
+function decodeForInspection(value: string): string {
+  let decoded = value;
+  for (let pass = 0; pass < 2; pass += 1) {
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) break;
+      decoded = next;
+    } catch {
+      // Malformed escape sequence - inspect what we have and stop.
+      break;
+    }
+  }
+  return decoded.toLowerCase();
+}
+
+// PHP-CGI argument injection and common backdoor/exec paths.
+const BLOCKED_PATTERNS = [
+  "?-d",
+  "auto_prepend_file",
+  "auto_append_file",
+  "allow_url_include",
+  "disable_functions",
+  "safe_mode",
+  "php://input",
+  "data://",
+];
+
+const BLOCKED_PATHS = [
+  "..",
+  "%2e%2e",
+  ".php",
+  "/wp-admin",
+  "/wp-login",
+  "xmlrpc.php",
+  "cgi-bin",
+];
+
+// CGI injection commonly arrives as a query parameter whose name starts with a
+// dash (e.g. `?-d allow_url_include=on`). No legitimate route here uses one.
+const CGI_DASH_PARAM = /(^|[?&])-[a-z]/i;
+
+export function isBlockedRequest(url: URL): boolean {
+  const rawPath = url.pathname.toLowerCase();
+  const rawSearch = url.search.toLowerCase();
+  const inspected = [
+    rawPath,
+    rawSearch,
+    decodeForInspection(rawPath),
+    decodeForInspection(rawSearch),
+  ];
+
+  if (inspected.some((value) => CGI_DASH_PARAM.test(value))) {
+    return true;
+  }
+
+  if (BLOCKED_PATTERNS.some((pattern) => inspected.some((value) => value.includes(pattern)))) {
+    return true;
+  }
+
+  return BLOCKED_PATHS.some((pattern) => inspected.some((value) => value.includes(pattern)));
 }
 
 export default {
@@ -26,17 +96,8 @@ export default {
     ctx: ExecutionContext,
   ): Promise<Response> {
     const url = new URL(request.url);
-    const searchString = url.search.toLowerCase();
-    const pathString = url.pathname.toLowerCase();
 
-    const blockedPatterns = [
-      "?-d", "auto_prepend_file", "auto_append_file", "allow_url_include", "disable_functions", "safe_mode"
-    ];
-    const blockedPaths = [
-      "..", "%2e%2e", ".php", "/wp-admin", "/wp-login", "xmlrpc.php", "cgi-bin"
-    ];
-
-    if (blockedPatterns.some(p => searchString.includes(p)) || blockedPaths.some(p => pathString.includes(p) || searchString.includes(p))) {
+    if (isBlockedRequest(url)) {
       return new Response("Forbidden", { status: 403, headers: getCorsHeaders(request, env) });
     }
 
