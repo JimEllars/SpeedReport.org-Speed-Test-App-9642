@@ -218,6 +218,76 @@ describe('Core telemetry ingress', () => {
     expect(kv.store.has('dlq:lead:SR-CORRUPT')).toBe(false);
   });
 
+  it('drops a permanently rejected entry instead of blocking the queue behind it', async () => {
+    const entry = (testId: string) =>
+      JSON.stringify({
+        rawBody: JSON.stringify({ payload: { testId }, evaluation: {} }),
+        reason: 'core unreachable',
+        bufferedAt: new Date().toISOString(),
+      });
+
+    // Insertion order puts the poisoned entry at the head of the DLQ listing.
+    const kv = createKv({
+      'dlq:lead:SR-POISON': entry('SR-POISON'),
+      'dlq:lead:SR-HEALTHY': entry('SR-HEALTHY'),
+    });
+    const env = createEnv(kv);
+    const { ctx, pending } = createCtx();
+
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('bad payload', { status: 422 }))
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const request = new Request('https://speedreport.org/api/telemetry', {
+      method: 'POST',
+      body: JSON.stringify({
+        testId: 'SR-TRIGGER',
+        downloadMbps: 900,
+        uploadMbps: 900,
+        latencyMs: 4,
+        jitterMs: 1,
+        packetLoss: 0,
+        isp: 'Fiber Co',
+      }),
+    });
+
+    await handleTelemetry(request, env, ctx);
+    await Promise.all(pending);
+
+    // The 422 entry is discarded rather than retried into the TTL.
+    expect(kv.store.has('dlq:lead:SR-POISON')).toBe(false);
+    // The healthy entry behind it still gets replayed and cleared.
+    expect(kv.store.has('dlq:lead:SR-HEALTHY')).toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps retrying entries when Core is merely unhealthy', async () => {
+    const kv = createKv({
+      'dlq:lead:SR-RETRY': JSON.stringify({
+        rawBody: JSON.stringify({ payload: { testId: 'SR-RETRY' }, evaluation: {} }),
+        reason: 'http_503',
+        bufferedAt: new Date().toISOString(),
+      }),
+    });
+    const env = createEnv(kv);
+    const { ctx, pending } = createCtx();
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('unavailable', { status: 503 })));
+
+    const request = new Request('https://speedreport.org/api/telemetry', {
+      method: 'POST',
+      body: JSON.stringify({ testId: 'SR-Y', downloadMbps: 900, uploadMbps: 900, latencyMs: 3, jitterMs: 1, packetLoss: 0 }),
+    });
+
+    await handleTelemetry(request, env, ctx);
+    await Promise.all(pending);
+
+    // A 5xx must survive for a later replay rather than being dropped.
+    expect(kv.store.has('dlq:lead:SR-RETRY')).toBe(true);
+  });
+
   it('buffers manual lead submissions when Core is unreachable', async () => {
     const kv = createKv();
     const env = createEnv(kv);

@@ -3,6 +3,7 @@ import { sendAnonymousTelemetry, trackEvent } from "../utils/telemetry";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { STATES } from '../common/testConstants';
 import {
+  PHASE_BUDGET_MS,
   bufferGrade,
   fetchMeta,
   measureDownload,
@@ -86,7 +87,7 @@ export function useSpeedTest(onComplete) {
       trackEvent('phase_transition', { phase: 'IDLE' });
 
     // Helper to create phase-specific abort signals that respect the main cancellation
-    const createPhaseSignal = (timeoutMs = 12000) => {
+    const createPhaseSignal = (timeoutMs = PHASE_BUDGET_MS) => {
       const phaseController = new AbortController();
       const timeoutId = setTimeout(() => phaseController.abort(new Error('Phase timeout')), timeoutMs);
 
@@ -148,7 +149,7 @@ export function useSpeedTest(onComplete) {
       setState(STATES.DOWNLOAD);
       trackEvent('phase_transition', { phase: 'DOWNLOAD' });
       let dlRes = { bandwidth: 0, loadedPing: null };
-      const dlPhase = createPhaseSignal(12000);
+      const dlPhase = createPhaseSignal();
       try {
         dlRes = await measureDownload(
           (value, ping) => updateLive('download', value, ping),
@@ -166,7 +167,7 @@ export function useSpeedTest(onComplete) {
       trackEvent('phase_transition', { phase: 'UPLOAD' });
       setSamples([]); // Reset samples for upload
       let ulRes = { bandwidth: 0, loadedPing: null };
-      const ulPhase = createPhaseSignal(12000);
+      const ulPhase = createPhaseSignal();
       try {
         ulRes = await measureUpload(
           (value, ping) => updateLive('upload', value, ping),
@@ -202,6 +203,9 @@ export function useSpeedTest(onComplete) {
       if (!dlRes.bandwidth || !ulRes.bandwidth) {
         partialFailure = true;
       }
+      if (dlRes.stalled || ulRes.stalled) {
+        partialFailure = true;
+      }
 
       const report = {
         id: `SR-${Date.now().toString(36).toUpperCase()}`,
@@ -214,7 +218,12 @@ export function useSpeedTest(onComplete) {
       setMetrics(completeMetrics);
       setState(partialFailure ? STATES.COMPLETED_PARTIAL : STATES.COMPLETE);
       if (partialFailure) {
-        setError('Test completed partially due to network instability.');
+        const stalledPhase = dlRes.stalled ? 'download' : ulRes.stalled ? 'upload' : null;
+        setError(
+          stalledPhase
+            ? `Network stall detected during ${stalledPhase}; measured throughput may understate capacity.`
+            : 'Test completed partially due to network instability.'
+        );
       }
       sendAnonymousTelemetry(report);
       onComplete(report);
@@ -226,15 +235,7 @@ export function useSpeedTest(onComplete) {
         return;
       }
 
-
-      if (reason.message && reason.message.includes('stall detected')) {
-        setError(reason.message);
-        setState(STATES.ERROR);
-      } else {
-        setError(reason.message || 'The test could not be completed.');
-        setState(STATES.ERROR);
-      }
-
+      setError(reason.message || 'The test could not be completed.');
       setState(STATES.ERROR);
     } finally {
       if (controllerRef.current === controller) {

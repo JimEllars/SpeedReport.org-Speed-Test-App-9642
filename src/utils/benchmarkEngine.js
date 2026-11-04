@@ -1,4 +1,9 @@
 import { API_BASE } from '../common/testConstants';
+// Static, not dynamic: telemetry.js imports nothing, so there is no cycle, and
+// every other consumer already imports it statically. The dynamic import only
+// defeated Vite's chunk splitting (a build warning) and cost a promise hop in a
+// 50ms interval.
+import { trackEvent } from '../utils/telemetry.js';
 
 const round = (value, digits = 1) => Number(value.toFixed(digits));
 
@@ -138,13 +143,23 @@ async function probeLoadedPing(signal) {
 // events to 250-500ms granularity, and large uploads can legitimately report no
 // new bytes for several seconds. A 6000ms floor keeps slow-but-alive links from
 // being torn down mid-phase.
-const STALL_THRESHOLD_MS = 6000;
+export const STALL_THRESHOLD_MS = 6000;
+
+// Phase budgets. The engine's internal timeout must be strictly smaller than the
+// caller's hard abort backstop (useSpeedTest builds phase signals from
+// PHASE_BUDGET_MS). If the caller's budget were smaller, it would always win and
+// the engine's graceful partial-result path could never run — a slow-but-alive
+// link would be hard-aborted and scored 0.0 Mbps instead of returning the
+// throughput measured up to that point.
+export const PHASE_TIMEOUT_MS = 10000; // engine graceful phase budget
+export const PHASE_ABORT_BACKOFF_MS = 2500; // margin before the caller's hard abort
+export const PHASE_BUDGET_MS = PHASE_TIMEOUT_MS + PHASE_ABORT_BACKOFF_MS; // 12500
 
 // Helper to calculate rolling throughput over the last second.
 // A 200ms window was too tight for real-world B2B links: a single delayed progress
 // callback emptied the window and the gauge snapped to 0.0 Mbps. 1000ms spans
 // multiple browser throttling ticks so the live readout stays continuous.
-class ThroughputCalculator {
+export class ThroughputCalculator {
   constructor() {
     this.chunks = []; // { bytes: number, time: number }
     this.totalBytesInWindow = 0;
@@ -246,6 +261,7 @@ async function consumeDownload(bytes, calculator, signal) {
 
 export async function measureDownload(onProgress = () => {}, signal) {
   let phaseFinished = false;
+  let stalled = false;
   const phaseController = new AbortController();
   const phaseSignal = phaseController.signal;
   // If user aborts, also abort our phase controller
@@ -254,7 +270,6 @@ export async function measureDownload(onProgress = () => {}, signal) {
     if (signal.aborted) phaseController.abort();
   }
 
-  const PHASE_TIMEOUT_MS = 15000;
   const started = performance.now();
   let timeoutId;
   const timeoutPromise = new Promise((_, reject) => {
@@ -272,7 +287,12 @@ export async function measureDownload(onProgress = () => {}, signal) {
 
   let progressIntervalId = setInterval(() => {
     if (calculator.checkStall()) {
-      import('../utils/telemetry.js').then(t => t.trackEvent('network_stall', { phase: 'DOWNLOAD' })).catch(() => {});
+      stalled = true;
+      // Stop sampling before aborting. The abort only settles once the in-flight
+      // streams unwind, and until then this interval would keep firing — emitting
+      // a duplicate network_stall event and a stale 0 Mbps readout every 50ms.
+      clearInterval(progressIntervalId);
+      trackEvent('network_stall', { phase: 'DOWNLOAD' });
       phaseController.abort(new Error('Network stall detected during download'));
       return;
     }
@@ -296,7 +316,10 @@ export async function measureDownload(onProgress = () => {}, signal) {
     if (currentMbps > 200) chunkSize = 25 * 1024 * 1024;
 
     return consumeDownload(chunkSize, calculator, phaseSignal).then(() => {
-      if (!signal?.aborted && !phaseFinished) {
+      // phaseSignal, not just the caller's signal: a stall or phase-budget abort
+      // fires on the phase controller, and continuing here would issue one more
+      // download request against an already-closed phase.
+      if (!phaseSignal.aborted && !signal?.aborted && !phaseFinished) {
          const currentMbps = calculator.getLiveSpeedMbps();
          if (currentMbps > 0 && currentMbps < 20 && activeStreams > 2) {
              activeStreams--;
@@ -349,7 +372,8 @@ export async function measureDownload(onProgress = () => {}, signal) {
 
   return {
     bandwidth: round(calculator.getFinalSpeedMbps()),
-    loadedPing: avgPing ? round(avgPing) : null
+    loadedPing: avgPing ? round(avgPing) : null,
+    stalled
   };
 }
 
@@ -461,6 +485,7 @@ function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
 
 export async function measureUpload(onProgress = () => {}, signal) {
   let phaseFinished = false;
+  let stalled = false;
   const phaseController = new AbortController();
   const phaseSignal = phaseController.signal;
   // If user aborts, also abort our phase controller
@@ -469,7 +494,6 @@ export async function measureUpload(onProgress = () => {}, signal) {
     if (signal.aborted) phaseController.abort();
   }
 
-  const PHASE_TIMEOUT_MS = 15000;
   const started = performance.now();
   let timeoutId;
   const timeoutPromise = new Promise((_, reject) => {
@@ -487,7 +511,10 @@ export async function measureUpload(onProgress = () => {}, signal) {
 
   let progressIntervalId = setInterval(() => {
     if (calculator.checkStall()) {
-      import('../utils/telemetry.js').then(t => t.trackEvent('network_stall', { phase: 'UPLOAD' })).catch(() => {});
+      stalled = true;
+      // See measureDownload: emit exactly one stall event per phase.
+      clearInterval(progressIntervalId);
+      trackEvent('network_stall', { phase: 'UPLOAD' });
       phaseController.abort(new Error('Network stall detected during upload'));
       return;
     }
@@ -503,7 +530,7 @@ export async function measureUpload(onProgress = () => {}, signal) {
   const startStream = async () => {
     let ladderIndex = 0;
 
-    while (!signal?.aborted && !phaseFinished) {
+    while (!phaseSignal.aborted && !signal?.aborted && !phaseFinished) {
       const size = UPLOAD_CHUNK_LADDER_BYTES[
         Math.min(ladderIndex, UPLOAD_CHUNK_LADDER_BYTES.length - 1)
       ];
@@ -568,7 +595,8 @@ export async function measureUpload(onProgress = () => {}, signal) {
 
   return {
     bandwidth: round(calculator.getFinalSpeedMbps()),
-    loadedPing: avgPing ? round(avgPing) : null
+    loadedPing: avgPing ? round(avgPing) : null,
+    stalled
   };
 }
 

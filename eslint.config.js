@@ -9,7 +9,10 @@ export default [
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
-      ecmaVersion: 2020,
+      // 2022 (not 2020) so ES2021 numeric separators (1_000_000) parse. The
+      // throughput-calculator tests use them for byte/millisecond readability,
+      // and the Vite/Node 24 toolchain already targets well past 2020.
+      ecmaVersion: 2022,
       globals: {
         ...globals.browser,
         ...globals.node,
