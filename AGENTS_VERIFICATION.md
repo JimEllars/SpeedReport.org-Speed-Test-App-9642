@@ -7,6 +7,237 @@ actually run against the commit it claims to cover.
 
 ---
 
+## Run: 2026-11-04 — 04:35 EST daily review
+
+- **Repository:** `JimEllars/SpeedReport.org-Speed-Test-App-9642`
+- **Base commit:** `06e4a6e` (`feat(benchmark): widen throughput window, ramp uploads, buffer Core dispatches in DLQ (#65)`)
+- **Branch:** `feat/speedreport-2026-11-04-phase-budget-ci-gating`
+- **Node / npm:** `v22.23.4` / `10.9.9`
+- **Upstream sync:** `git fetch origin main` and `git fetch --all --prune` run
+  before branching. `git log origin/main --since="24 hours ago" --oneline`
+  returned **no commits** — no human changes landed in the preceding 24h and
+  `HEAD` already equalled `origin/main`, so there was nothing to rebase onto.
+- **Open PRs at start:** 4, all Dependabot dependency bumps (#49, #51, #63, #64).
+  No feature PRs were open and no feature branch had failing checks. Untouched by
+  this run.
+
+### Starting state: uncommitted work in the tree
+
+The working tree carried an unfinished change set from the previous session
+(3 modified files, 2 untracked test files). It was reviewed rather than reverted:
+items 1–2 of the step-4 roadmap and the `SpeedGauge` readouts were already
+committed in `#65`, and this residue completed the phase-budget and stall-surfacing
+work. It contained one defect that would have failed CI (see "Defects fixed" #1).
+
+### Files modified
+
+| File | Lines (before → after) | Changed line ranges |
+| --- | --- | --- |
+| `.github/workflows/deploy-cloudflare.yml` | 50 → 83 | 25–43 (`validate-worker` dry-run job), 45–50 (`deploy-worker` gated to `push` on `main`), 60–66 (`.wrangler` cleanup before dry-run) |
+| `src/utils/benchmarkEngine.js` | 582 → 610 | 1–6 (static `telemetry` import), 141–151 (`STALL_THRESHOLD_MS`, `PHASE_TIMEOUT_MS`, `PHASE_ABORT_BACKOFF_MS`, `PHASE_BUDGET_MS` exported), 262 (`stalled` flag), 286–293 (clear interval + single stall event), 316–320 (`phaseSignal` guard), 486–493 (upload stall path), 528 (`phaseSignal` loop guard), 584–588 / 605–609 (`stalled` in return shape) |
+| `src/hooks/useSpeedTest.js` | 243 → 258 | 6 (`PHASE_BUDGET_MS` import), 90 (`createPhaseSignal` default), 152 / 170 (download/upload phase signals), 206–208 (stall sets `partialFailure`), 220–227 (stall-specific copy), 230–239 (dead `stall detected` branch removed) |
+| `speedreport-worker/src/telemetry.ts` | 468 → 490 | 223–245 (`TRANSIENT_4XX`, `isPermanentFailure`), 247–253 (replay doc), 283–297 (drop permanent failures instead of breaking the drain) |
+| `tests/telemetryIngress.test.ts` | 264 → 334 | 221–287 (two new DLQ classification tests) |
+| `eslint.config.js` | 39 → 42 | 9–13 (`ecmaVersion` 2020 → 2022) |
+| `vitest.config.js` | 9 → 15 | 5–10 (`test.env.NODE_ENV` pin) |
+| `tests/throughputCalculator.test.js` | new → 69 | whole file |
+| `tests/useSpeedTestStall.test.js` | new → 73 | whole file |
+| `CHANGELOG.md`, `AGENTS_VERIFICATION.md`, `DEBUGGING_NOTES.md`, `Continued Development Plan.md` | — | this run's entries |
+
+### Files deleted
+
+None. No scratch artifacts were present in the tree (`*.patch` was already
+removed on 2026-11-02 and is git-ignored).
+
+### Defects fixed
+
+1. **The new `validate-worker` CI job would have failed on every PR.** It ran the
+   root `npm run build` and then `wrangler deploy --dry-run` inside
+   `speedreport-worker/`. The Vite Cloudflare plugin writes
+   `.wrangler/deploy/config.json` (pointing at `dist/wrangler.json`) during that
+   build, and wrangler then aborts with *"Found both a user configuration file at
+   wrangler.jsonc and a deploy configuration file at ../.wrangler/deploy/config.json"*.
+   Reproduced locally, then fixed with a `rm -rf ../.wrangler .wrangler` step.
+2. **A permanently rejected DLQ entry blocked the whole queue.** `replayDlq`
+   stopped at the first non-2xx, so one payload Core always rejects (400/413/422)
+   sat at the head of the listing and starved every lead behind it until the 24h
+   TTL expired. Non-retryable 4xx entries are now dropped and logged
+   (`telemetry.dlq_dropped`); 5xx, status 0, 401/403 and 408/425/429 still stop
+   the drain so a struggling Core is not hammered.
+3. **Stall emitted duplicate `network_stall` events.** The 50ms progress interval
+   kept firing between `phaseController.abort()` and the `finally` that cleared
+   it, re-reporting the stall (and a stale 0.0 Mbps `onProgress`) on every tick
+   while the streams unwound. The interval is now cleared before the abort, so
+   each phase emits exactly one event.
+4. **The engine re-requested after its own phase was closed.** Both stream loops
+   gated continuation on the caller's `signal`, not `phaseSignal`, so a
+   stall/timeout abort still issued one more request before noticing.
+5. **`npm run lint` failed to parse the new test file.** `eslint.config.js` pinned
+   `ecmaVersion: 2020`, and ES2021 numeric separators (`1_000_000`) in
+   `tests/throughputCalculator.test.js` are a parse error there. Raised to 2022.
+6. **`npm test` was red under a production `NODE_ENV`.** This sandbox exports
+   `NODE_ENV=production`; React then resolves its production bundle at require
+   time and `@testing-library`'s `act()` throws *"act(...) is not supported in
+   production builds of React"*. Every hook/component suite failed for reasons
+   unrelated to the code. `vitest.config.js` now pins `test.env.NODE_ENV`.
+7. **Vite chunking warning.** `benchmarkEngine` imported `telemetry.js` both
+   dynamically (stall handlers) and statically (via other importers), defeating
+   the split. `telemetry.js` imports nothing, so the engine now imports
+   `trackEvent` statically; the build warning is gone and the entry chunk dropped
+   from 897.77 kB to 895.72 kB.
+
+### Gates
+
+All commands below were run at repo root unless stated. `NODE_ENV=production` is
+ambient in this sandbox (see defect 6); no gate overrides it except where noted.
+
+#### Gate 1 — Lint
+
+```
+$ npm run lint
+
+> speedreport-org@1.0.0 lint
+> eslint .
+
+LINT_EXIT=0
+```
+
+Zero errors, zero warnings, no findings.
+
+#### Gate 2 — Unit tests (baseline, pre-change)
+
+The pre-change tree failed lint (defect 5) and could not run its jsdom suites
+(ambient `NODE_ENV`, defect 6). The true baseline of the committed code, with
+`NODE_ENV=test` supplied explicitly, was:
+
+```
+$ NODE_ENV=test npx vitest run
+
+ Test Files  10 passed (10)
+      Tests  60 passed (60)
+   Start at  04:02:20
+   Duration  333.68s (environment 81%, import 8%, transform 7%, tests 3%, worker 2%)
+```
+
+#### Gate 3 — Unit tests (post-change)
+
+Plain `npm test`, no environment override — the config pin is doing its job:
+
+```
+$ npm test
+
+ Test Files  10 passed (10)
+      Tests  62 passed (62)
+   Start at  05:06:45
+   Duration  300.81s (environment 65%, transform 24%, import 6%, tests 3%, worker 2%)
+
+Environment  jsdom was created 10 times · 166.13s total, 65% of tracked time
+```
+
+Delta: +2 tests (DLQ permanent-vs-transient classification), +2 files inherited
+from the previous session's residue (`throughputCalculator`, `useSpeedTestStall`).
+
+Per-file confirmation, each run individually under host contention:
+
+```
+$ npx vitest run --pool=threads tests/throughputCalculator.test.js
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+
+$ npx vitest run --pool=threads tests/useSpeedTestStall.test.js
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+
+$ npx vitest run --pool=threads tests/telemetryIngress.test.ts
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+
+$ npx vitest run --pool=threads tests/useSpeedTest.test.js
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+
+$ npx vitest run --pool=threads tests/vault.test.js
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+
+$ npx vitest run --pool=threads tests/readiness.test.js
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+
+$ npx vitest run --pool=threads tests/reporter.test.js
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+
+$ npx vitest run --pool=threads tests/axim-core.test.js
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+```
+
+Total: 4+3+9+5+3+6+4+4 = 38, plus `worker.test.ts` (18) and
+`telemetry.test.js` (6) inside the 62 above.
+
+#### Gate 4 — Production build
+
+```
+$ npm run build
+
+vite v6.4.4 building for production...
+transforming...
+✓ 644 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/.assetsignore                0.02 kB
+dist/wrangler.json                1.08 kB │ gzip:   0.56 kB
+dist/index.html                   3.26 kB │ gzip:   1.10 kB
+dist/assets/index-DvneVEv9.css   26.95 kB │ gzip:   7.13 kB
+dist/assets/index-CoOfNT_Q.js   895.72 kB │ gzip: 309.69 kB
+✓ built in 2m 25s
+```
+
+No bundling errors and, unlike the previous run, **no dynamic/static import
+warning** (defect 7).
+
+#### Gate 5 — Worker typecheck and dry-run
+
+Mirrors the CI job exactly, including the cleanup step added by defect 1:
+
+```
+$ cd speedreport-worker && npx tsc --noEmit
+TSC_EXIT=0
+
+$ rm -rf ../.wrangler .wrangler && npx wrangler deploy --dry-run
+ ⛅️ wrangler 4.135.0
+✨ Read 10 files from the assets directory /workspace/review/speedreport/dist
+Total Upload: 31.66 KiB / gzip: 8.58 KiB
+Your Worker has access to the following bindings:
+env.TELEMETRY (speedreport_telemetry)                     Analytics Engine Dataset
+env.ASSETS                                                Assets
+env.REPORT_RECIPIENT_TO ("contact@speedreport.org")       Environment Variable
+env.REPORT_RECIPIENT_BCC ("jrellars@gmail.com")           Environment Variable
+--dry-run: exiting now.
+DRYRUN_EXIT=0
+```
+
+`env.PROSPECT_STORE` is still absent from the binding list — the operator action
+from 2026-11-02 remains open and the DLQ continues to log
+`telemetry.dlq_unbound` rather than write.
+
+### Host contention during this run
+
+Three sibling agent threads (`axim-web3`, `axim-support`) ran builds and test
+suites on the same 2 vCPU / 3.9 GB host. Load average held at 10–16, and the
+browser/flush tooling plus `rclone sync` competed for I/O. Consequences:
+
+- Two full-suite attempts were `SIGKILL`ed (exit 137) or hit vitest's 60s
+  worker-start budget (`Timeout waiting for worker to respond`). No test failed;
+  affected files never started. Retried once memory freed.
+- `tests/throughputCalculator.test.js` was moved to
+  `// @vitest-environment node`. It is pure arithmetic on `ThroughputCalculator`
+  and was paying ~25s and a few hundred MB for a jsdom environment; environment
+  cost for that file dropped from 76% to 2% of runtime.
+
+---
+
 ## Run: 2026-11-02 — 04:35 EST daily review
 
 - **Repository:** `JimEllars/SpeedReport.org-Speed-Test-App-9642`

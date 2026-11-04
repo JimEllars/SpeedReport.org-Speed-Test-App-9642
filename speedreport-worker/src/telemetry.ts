@@ -221,10 +221,32 @@ async function bufferFailedDispatch(
 }
 
 /**
+ * A failure is permanent when Core will reject the same bytes no matter how
+ * often we replay them (malformed payload, oversized body, failed schema
+ * validation). Retrying those only burns the 24h TTL and, because replayDlq
+ * stops at the first transient failure, a single poisoned entry at the head of
+ * the queue would block every lead behind it.
+ *
+ * Deliberately NOT permanent: network/timeout (status 0), 5xx, 401/403 (a
+ * rotated AXIM_INTERNAL_KEY is recoverable), and the transient 4xx set.
+ */
+const TRANSIENT_4XX = new Set([408, 425, 429]);
+
+function isPermanentFailure(result: DispatchResult): boolean {
+  if (result.ok) return false;
+  if (result.status === 0) return false;
+  if (result.status >= 500) return false;
+  if (result.status === 401 || result.status === 403) return false;
+  if (TRANSIENT_4XX.has(result.status)) return false;
+  return result.status >= 400 && result.status < 500;
+}
+
+/**
  * Best-effort drain of buffered dispatches. Runs on the request path (inside
  * waitUntil) so a recovered Core connection clears the backlog without a
- * separate cron. Stops at the first failure to avoid hammering a struggling
- * Core; the TTL expires anything that never gets through.
+ * separate cron. Stops at the first *transient* failure to avoid hammering a
+ * struggling Core; permanently rejected entries are dropped so they cannot
+ * block the queue. The TTL expires anything that never gets through.
  */
 async function replayDlq(env: any): Promise<void> {
   if (!env.PROSPECT_STORE || typeof env.PROSPECT_STORE.list !== "function") return;
@@ -257,6 +279,21 @@ async function replayDlq(env: any): Promise<void> {
       }
 
       const result = await dispatchToCore(env, rawBody);
+
+      if (!result.ok && isPermanentFailure(result)) {
+        // Core has rejected these exact bytes; replaying cannot succeed.
+        await env.PROSPECT_STORE.delete(key);
+        console.warn(
+          JSON.stringify({
+            event: "telemetry.dlq_dropped",
+            key,
+            status: result.status,
+            reason: result.reason,
+          }),
+        );
+        continue;
+      }
+
       if (!result.ok) break;
 
       await env.PROSPECT_STORE.delete(key);

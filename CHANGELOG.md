@@ -5,6 +5,81 @@ first and timestamped with the review window that produced them.
 
 ---
 
+## [2026-11-04] — 04:35 EST daily review
+
+Phase-budget ordering, stall surfacing, CI deploy gating, and a DLQ queue that
+can no longer be blocked by one poisoned lead.
+
+### Fixed
+
+- **A slow-but-alive link can no longer be scored `0.0 Mbps`.** The engine's
+  internal phase timeout was 15s while `useSpeedTest` hard-aborted the phase at
+  12s, so the parent always won and the engine's graceful partial-result path
+  never ran. The engine now finishes at 10s (`PHASE_TIMEOUT_MS`) inside a 12.5s
+  caller budget (`PHASE_BUDGET_MS = 10000 + 2500`), returning the throughput
+  measured up to that point. `src/utils/benchmarkEngine.js`,
+  `src/hooks/useSpeedTest.js`
+- **Stalls are reported instead of silently discarded.** `measureDownload` /
+  `measureUpload` now return a `stalled` flag; `useSpeedTest` surfaces it as
+  `COMPLETED_PARTIAL` with phase-specific copy ("Network stall detected during
+  download; measured throughput may understate capacity"). Previously the stall
+  reason was swallowed and the dead `reason.message.includes('stall detected')`
+  branch was unreachable.
+- **Stall emitted duplicate `network_stall` analytics events.** The 50ms progress
+  interval kept firing between the phase abort and the `finally` that cleared it,
+  re-reporting the stall on every tick. Cleared before the abort now.
+- **DLQ head-of-line blocking.** `replayDlq` stopped at the first non-2xx, so a
+  payload Core always rejects starved every lead behind it until the 24h TTL.
+  Non-retryable 4xx entries are dropped and logged (`telemetry.dlq_dropped`);
+  `5xx`, status 0, `401/403` and `408/425/429` still stop the drain.
+  `speedreport-worker/src/telemetry.ts`
+- **Pull requests could deploy to production.** `.github/workflows/deploy-cloudflare.yml`
+  triggered `wrangler deploy` on `pull_request` as well as `push`, publishing
+  unreviewed PR branches to the live edge. Production deploy is now gated to
+  `push` on `main`; PRs get a typecheck + `wrangler deploy --dry-run` instead.
+- **Lint could not parse the new test file.** `eslint.config.js` pinned
+  `ecmaVersion: 2020`; ES2021 numeric separators are a parse error there. Raised
+  to 2022.
+- **`npm test` failed under an ambient production `NODE_ENV`.** React resolves
+  its production bundle and `act()` throws, turning every hook/component suite
+  red for reasons unrelated to the code. `vitest.config.js` pins
+  `test.env.NODE_ENV`.
+
+### Added
+
+- **`Validate Worker (dry-run)` CI job** for pull requests: typecheck plus
+  `wrangler deploy --dry-run`, with the `.wrangler` cleanup that the Vite plugin
+  makes necessary. PR branches are validated without touching the live edge.
+- **Phase-budget and stall regression tests.**
+  `tests/throughputCalculator.test.js` (window retention across a 400ms gap,
+  positive live speed, 6000ms stall boundary, budget ordering) and
+  `tests/useSpeedTestStall.test.js` (download/upload stall → `COMPLETED_PARTIAL`,
+  clean run → `COMPLETE`).
+- **DLQ classification tests** covering poisoned-entry eviction and 5xx
+  retention. `tests/telemetryIngress.test.ts`
+
+### Changed
+
+- **`telemetry.js` is imported statically by the engine.** It imports nothing, so
+  there was no cycle to avoid; the dynamic import only defeated Vite's chunk
+  split (build warning) and cost a promise hop inside a 50ms interval. Entry
+  chunk 897.77 kB → 895.72 kB.
+- **Stream loops gate on `phaseSignal`**, not just the caller's signal, so a
+  stall or timeout abort cannot issue one further request.
+- **`tests/throughputCalculator.test.js` runs in the node environment** — it is
+  pure arithmetic and was paying ~25s of jsdom setup for nothing.
+
+### Operator action required
+
+- `PROSPECT_STORE` KV namespace must still be created and bound
+  (`npx wrangler kv namespace create PROSPECT_STORE --config wrangler.jsonc`).
+  Verified absent from the dry-run binding list again this run. Until it exists,
+  the DLQ and the per-IP lead rate limiter degrade to logged no-ops.
+- Confirm the `axim-core` `X-Axim-Timestamp` replay window is <5 minutes, matching
+  the satellite's `Date.now()` signing.
+
+---
+
 ## [2026-11-02] — 04:35 EST daily review
 
 Measurement fidelity on commercial links, and closing the silent lead-loss path
