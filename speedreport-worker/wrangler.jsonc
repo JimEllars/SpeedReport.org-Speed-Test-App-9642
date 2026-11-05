@@ -32,13 +32,20 @@
     // 403 screen fire. Wildcards match any character sequence, so `/*.php`
     // covers a PHP probe at any depth.
     //
-    // Residual: a query-string-only vector such as `/?-d+allow_url_include=on`
-    // cannot be matched here because these patterns constrain the path, not the
-    // query. Closing that requires `run_worker_first: true`, which makes every
-    // static asset request a billable Worker invocation. Not needed today: the
-    // asset origin is Cloudflare's static store, not a PHP interpreter, so there
-    // is no CGI for the argument to reach. Documented in
-    // Continued Development Plan.md for the operator to decide.
+    // Residuals, verified against production and documented in
+    // Continued Development Plan.md for the operator:
+    //   1. A query-string-only vector such as `/?-d+allow_url_include=on` cannot
+    //      be matched here, because these patterns constrain the path and not
+    //      the query.
+    //   2. A traversal substring outside /api/* (e.g. `/%252e%252e/...`) cannot
+    //      be matched either, because it is a substring and not a prefix. Such
+    //      requests get the SPA shell with 200.
+    // Neither is an exposure: this origin is an uploaded asset manifest with
+    // not_found_handling below, not a filesystem, so a path either resolves to a
+    // real bundled asset or gets index.html. There is nothing to traverse to and
+    // no CGI binary for `?-d` to reach. Both would be closed by
+    // `run_worker_first: true`, at the cost of a billable Worker invocation for
+    // every static asset request.
     "run_worker_first": [
       "/api/*",
       "/health",
