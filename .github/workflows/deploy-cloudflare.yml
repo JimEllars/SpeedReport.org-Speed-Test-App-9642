@@ -19,6 +19,7 @@ jobs:
       - name: Build & Validate
         run: |
           npm ci
+          npm run lint
           npm run test
           npm run build
 
@@ -39,11 +40,12 @@ jobs:
         run: |
           npm ci
           npm run build
-      - name: Typecheck & dry-run Worker
+      - name: Typecheck, test & dry-run Worker
         run: |
           cd speedreport-worker
           npm ci
           npx tsc --noEmit
+          npm test
           # The root build's vite plugin emits .wrangler/deploy/config.json, which
           # makes wrangler abort with "Found both a user configuration file and a
           # deploy configuration file". Clear it before dry-running the Worker's own

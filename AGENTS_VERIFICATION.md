@@ -7,6 +7,234 @@ actually run against the commit it claims to cover.
 
 ---
 
+## Run: 2026-11-05 — 04:35 EST daily review
+
+- **Repository:** `JimEllars/SpeedReport.org-Speed-Test-App-9642`
+- **Base commit:** `d8b6244` (`feat(benchmark): order phase budgets, surface stalls, gate deploys to main (#66)`)
+- **Branch:** `feat/speedreport-2026-11-05-gauge-readout-and-cors`
+- **Node / npm:** `v22.23.4` / `10.9.9`
+- **Upstream sync:** `git fetch origin main` and `git fetch --all --prune` ran
+  before branching. `git log origin/main --since="24 hours ago" --oneline`
+  returned exactly one commit — `d8b6244`, this agent's own merged work from
+  2026-11-04. **No human commits landed in the preceding 24h.** No benchmark
+  thresholds or styling were changed by a human engineer, so there was no
+  upstream drift to absorb and `HEAD` already equalled `origin/main`.
+- **Open PRs at start:** 5, all Dependabot dependency bumps — #67 (follow-redirects
+  1.16.1 → 1.16.2), #64 (undici + wrangler), #63 (vite 6.4.5), #51 and #49
+  (sharp + wrangler/@cloudflare/vite-plugin). `gh pr checks` on all five: every
+  job **pass**. No feature PR was open and no feature branch had failing checks,
+  so there was no inherited red build to repair. The dependency backlog is left
+  to the maintainer (see *Operator actions*).
+- **Scratch artifacts:** none. `git status --porcelain --ignored` showed only
+  `dist/` and `.wrangler/`, both git-ignored. No `*.patch` or sprint dumps.
+
+### Starting state: baseline was green
+
+Lint, the full unit suite, the production build, the Worker typecheck, the Worker
+test run and `wrangler deploy --dry-run` were all green on the base commit before
+any edit. Forward feature work was therefore not frozen, and the step-4 roadmap
+items were audited against the live code rather than assumed.
+
+### Step-4 roadmap audit: all five items already shipped in #65/#66
+
+The brief's roadmap items were verified against the source, not the changelog:
+
+| Item | Evidence in the live tree |
+| --- | --- |
+| `windowSize = 1000` in `ThroughputCalculator` | `src/utils/benchmarkEngine.js:168` |
+| Progressive upload ladder 512 KiB → 1 MiB → 2 MiB → 4 MiB | `UPLOAD_CHUNK_LADDER_BYTES`, `benchmarkEngine.js:377–382`, walked per-stream at `:538` |
+| Stall threshold 6000 ms | `STALL_THRESHOLD_MS = 6000`, `benchmarkEngine.js:151` |
+| `xhr.status >= 200 && xhr.status < 300` on upload `load` | `benchmarkEngine.js:474` |
+| SpeedGauge phase messaging + emerald/cyan/purple accents | `PHASE_ACCENTS` / `PHASE_INDICATORS`, `SpeedGauge.jsx:32–53` |
+| HMAC-SHA256 over raw body + `X-Axim-Signature` / `X-Axim-Timestamp` | `speedreport-worker/src/telemetry.ts:126–143`, sent at `:160–167` |
+| DLQ at `dlq:lead:{testId}`, TTL 86400s, replayed on later requests | `telemetry.ts:108–109`, `:199–212`, `replayDlq` at `:245` |
+| CGI injection + traversal screening with 403 | `BLOCKED_PATTERNS` / `BLOCKED_PATHS` / `CGI_DASH_PARAM`, `index.ts:63–89`, 13-case matrix in `tests/worker.test.ts` |
+
+Nothing in the roadmap needed re-implementing. The defects below are what the
+review found *around* those features — two of them in the render path that the
+engine feeds.
+
+### Files modified
+
+| File | Lines (before → after) | Changed line ranges |
+| --- | --- | --- |
+| `src/components/SpeedGauge.jsx` | 233 → 230 | 18–26 (`formatSpeed` → `formatGaugeReading` returning `{digits, unit}`), 78–96 (`dt` computed before `lastTime` is overwritten, clamped 0–250 ms), 121 (`reading` derived once), 177–187 (render `reading.digits` / `reading.unit`) |
+| `speedreport-worker/src/http.ts` | 98 → 102 | 96 (`errorJson` forwards `env` to `getCorsHeaders`) |
+| `speedreport-worker/src/index.ts` | 162 → 182 | 26–45 (new `healthPayload`), 133–134 (`/health` returns it) |
+| `speedreport-worker/package.json` | 10 → 11 | 8 (`test` script delegating to the root vitest runner) |
+| `.github/workflows/deploy-cloudflare.yml` | 81 → 82 | 22 (`npm run lint` added to `validate`), 43–48 (`npm test` added to `validate-worker`) |
+| `tests/speedGauge.test.jsx` | new → 144 | whole file |
+| `tests/workerHttp.test.ts` | new → 106 | whole file |
+| `CHANGELOG.md`, `AGENTS_VERIFICATION.md`, `DEBUGGING_NOTES.md`, `Continued Development Plan.md` | — | this run's entries |
+
+### Files deleted
+
+None.
+
+### Defects fixed
+
+1. **The gauge readout was frozen for the entire test.** In the EMA animation
+   loop, `lastTime` was assigned `time` *before* `dt` was computed from it:
+
+   ```js
+   const animate = (time) => {
+     lastTime = time;                  // overwritten first
+     const dt = time - lastTime;       // therefore always 0
+     const fpsRatio = Math.min(dt / (1000 / 60), 2);   // 0
+     const dynamicAlpha = Math.min(EMA_ALPHA * fpsRatio, 1); // 0
+     const next = current + (targetValue - current) * dynamicAlpha; // == current
+   ```
+
+   `dynamicAlpha` collapsed to `0`, so `displayValue` never moved off its initial
+   value while the loop kept rescheduling forever. The centre number sat at
+   `0.0` through the whole download and upload phase even though the engine was
+   computing a healthy live speed. This is the same operator-visible symptom as
+   the 2026-11-02 window bug *3*, but in the render path rather than the
+   calculator, which is why the earlier fix did not clear it. Reproduced with a
+   new component test before the fix (`expected 0 to be greater than 490`), then
+   fixed by taking the delta before overwriting `lastTime` and clamping it.
+
+2. **A gigabit link rendered as `1234.5 Gbps`.** The digits came from
+   `value.toFixed(1)` (always Mbps magnitude) while the unit came from
+   `formatSpeed(value).split(' ').slice(1)` (which switches to Gbps above 1000),
+   so the two were scaled by different factors. Every circuit above 1000 Mbps
+   was overstated by 1000×; a 1.23 Gbps link read `1234.5 Gbps`. Both are now
+   produced by one function, so they cannot diverge. This is a credibility bug on
+   exactly the multi-gigabit commercial links the product targets, and the ARIA
+   `aria-valuenow`/`aria-valuemax` pair on the meter stayed correct throughout, so
+   assistive tech was reporting a different number from the visual readout.
+
+3. **`Access-Control-Allow-Origin` was wrong on every error response.**
+   `errorJson` called `getCorsHeaders(request)` without `env`, so an origin
+   whitelisted through `ALLOWED_ORIGINS` was ignored on the 4xx/5xx path and the
+   response carried the hardcoded default `https://speedreport.org` instead. The
+   browser then discarded the error body, so callers saw an opaque network
+   failure with no `code` or `message`. Success responses already forwarded `env`;
+   only the error helper did not. Verified by test: the pre-fix assertion got
+   `https://speedreport.org` for a `https://staging.speedreport.org` request.
+
+4. **`cd speedreport-worker && npm test` did not exist.** The Worker package had
+   no `test` script, so the runbook's Worker gate failed with
+   `npm error Missing script: "test"` and the Worker's own 38 tests were only
+   reachable through the root runner. Added a `test` script and wired it into the
+   `validate-worker` CI job.
+
+5. **CI never ran lint.** `validate` ran `npm run test` and `npm run build` only,
+   which is how the `ecmaVersion` parse error reached the tree on 2026-11-04
+   (noted as queued in `Continued Development Plan.md`). `npm run lint` is now the
+   first gate, so a lint failure blocks before the 4-minute build is spent.
+
+### Observability added (no behaviour change)
+
+`GET /health` now reports `degraded` and `dependencies: { prospectStore,
+leadForwarding }` as binding *states* only (`bound`/`unbound`,
+`configured`/`unconfigured`) — never the Core URL or the internal key. Without
+this, the `PROSPECT_STORE` binding gap (the one outstanding operator action, below)
+was visible only in Worker logs: the DLQ and the 30-req/30-min lead rate limiter
+both degrade to logged no-ops, and nothing pollable said so. A dedicated test
+asserts the endpoint does not leak the URL or key.
+
+### Verification (verbatim)
+
+All commands run in `/workspace/review/speedreport` after the edits.
+
+**1. Lint** — `npm run lint`
+
+```
+> speedreport-org@1.0.0 lint
+> eslint .
+```
+
+(no output — 0 errors, 0 warnings)
+
+**2. Full unit suite** — `npx vitest run`
+
+```
+ RUN  v5.0.3 /workspace/review/speedreport
+
+ Test Files  12 passed (12)
+      Tests  73 passed (73)
+   Start at  04:10:29
+   Duration  309.93s (environment 72%, import 12%, transform 8%, tests 5%, worker 3%)
+```
+
+Baseline before this run was 10 files / 62 tests. The 11 new tests are 4 in
+`tests/speedGauge.test.jsx` and 7 in `tests/workerHttp.test.ts`.
+
+**3. Production build** — `npm run build`
+
+```
+vite v6.4.4 building for production...
+transforming...
+✓ 644 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/.assetsignore                0.02 kB
+dist/wrangler.json                1.08 kB │ gzip:   0.56 kB
+dist/index.html                   3.26 kB │ gzip:   1.10 kB
+dist/assets/index-DvneVEv9.css   26.95 kB │ gzip:   7.13 kB
+dist/assets/index-CLM-iS62.js   895.74 kB │ gzip: 309.68 kB
+✓ built in 2m 38s
+```
+
+**4. Worker typecheck** — `cd speedreport-worker && npx tsc --noEmit`
+
+```
+(no output, exit 0)
+```
+
+**5. Worker tests** — `cd speedreport-worker && npm test`
+
+```
+> speedreport-edge-engine@1.0.0 test
+> cd .. && npx vitest run tests/worker.test.ts tests/workerHttp.test.ts tests/telemetryIngress.test.ts tests/reporter.test.js
+
+ RUN  v5.0.3 /workspace/review/speedreport
+
+ Test Files  4 passed (4)
+      Tests  38 passed (38)
+   Start at  04:07:49
+   Duration  124.40s (environment 73%, transform 15%, tests 7%, import 4%, worker 2%)
+```
+
+**6. Worker deploy dry-run** — `cd speedreport-worker && rm -rf ../.wrangler .wrangler && npx wrangler deploy --dry-run --config wrangler.jsonc`
+
+```
+ ⛅️ wrangler 4.135.0
+✨ Read 10 files from the assets directory /workspace/review/speedreport/dist
+Total Upload: 32.33 KiB / gzip: 8.80 KiB
+Your Worker has access to the following bindings:
+Binding                                                   Resource
+env.TELEMETRY (speedreport_telemetry)                     Analytics Engine Dataset
+env.ASSETS                                                Assets
+env.REPORT_RECIPIENT_TO ("contact@speedreport.org")       Environment Variable
+env.REPORT_RECIPIENT_BCC ("jrellars@gmail.com")           Environment Variable
+
+--dry-run: exiting now.
+```
+
+The binding list confirms `PROSPECT_STORE` is still unbound — see *Operator
+actions required* in `Continued Development Plan.md`. No Cloudflare API token is
+available in this environment, so the namespace could not be created here.
+
+### Operator actions required
+
+1. **Create and bind the `PROSPECT_STORE` KV namespace** — unchanged from
+   2026-11-04 and now surfaced on `/health` as `dependencies.prospectStore:
+   "unbound"` with `degraded: true`.
+
+   ```bash
+   cd speedreport-worker
+   npx wrangler kv namespace create PROSPECT_STORE --config wrangler.jsonc
+   ```
+
+2. **Triage the five Dependabot PRs** (#67, #64, #63, #51, #49). All checks are
+   green. Not merged by this run: they cross the dependency graph of a deploy
+   pipeline that performs a real `wrangler deploy` on `main`, so a human should
+   decide whether they ride together or one at a time.
+
+---
+
 ## Run: 2026-11-04 — 04:35 EST daily review
 
 - **Repository:** `JimEllars/SpeedReport.org-Speed-Test-App-9642`

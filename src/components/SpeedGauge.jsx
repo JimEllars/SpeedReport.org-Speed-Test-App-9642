@@ -15,14 +15,16 @@ function getGaugeMaxScale(mbps) {
   return 2000000; // 2 Tbps ceiling
 }
 
-function formatSpeed(value) {
-  if (Number.isNaN(value) || value === null) {
-    return '0.0 Mbps';
-  }
+// Single source of truth for the centre readout: the digits and the unit must be
+// scaled by the same factor. Formatting them independently rendered a 1.23 Gbps
+// link as "1234.5 Gbps" - a 1000x overstatement on exactly the multi-gigabit
+// circuits commercial buyers are running.
+function formatGaugeReading(mbps) {
+  const value = Number.isFinite(mbps) && mbps > 0 ? mbps : 0;
   if (value >= 1000) {
-    return `${(value / 1000).toFixed(2)} Gbps`;
+    return { digits: (value / 1000).toFixed(2), unit: 'Gbps' };
   }
-  return `${value.toFixed(1)} Mbps`;
+  return { digits: value.toFixed(1), unit: 'Mbps' };
 }
 
 // Centre-of-gauge phase readout. Each phase gets its own accent so the operator
@@ -76,9 +78,6 @@ export default function SpeedGauge({
 
 
     const animate = (time) => {
-      // dt unused in EMA but we track time for framerate consistency
-      lastTime = time;
-
       const current = displayValueRef.current;
       const diff = targetValue - current;
 
@@ -88,8 +87,12 @@ export default function SpeedGauge({
       } else {
         // Exponential moving average interpolation
 
-        // Use a time-based interpolation to eliminate jitter on 120Hz displays
-        const dt = time - lastTime;
+        // Read the previous frame timestamp *before* overwriting it. Taking the
+        // delta afterwards made dt unconditionally 0, which zeroed dynamicAlpha
+        // and left the readout frozen at its initial value for the whole phase.
+        // Clamped so a backgrounded tab does not produce a single-frame snap.
+        const dt = Math.min(Math.max(time - lastTime, 0), 250);
+        lastTime = time;
         const fpsRatio = Math.min(dt / (1000 / 60), 2); // Normalize against 60fps
         const dynamicAlpha = Math.min(EMA_ALPHA * fpsRatio, 1);
         const next = current + (targetValue - current) * dynamicAlpha;
@@ -115,6 +118,7 @@ export default function SpeedGauge({
   const percent = Math.min((value / maxScaleMbps) * 100, 100);
 
   const phaseIndicator = PHASE_INDICATORS[state] || DEFAULT_INDICATOR;
+  const reading = formatGaugeReading(value);
 
 
   const speedPoints = samples.length
@@ -173,15 +177,14 @@ export default function SpeedGauge({
 
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none" style={{ fontVariantNumeric: 'tabular-nums', transform: 'translateZ(0)', paddingTop: '20px' }} aria-hidden="true">
                     {(() => {
-            const displayString = value.toFixed(1);
-            const isWide = displayString.length >= 6;
+            const isWide = reading.digits.length >= 6;
             return (
               <strong className={`${isWide ? 'text-4xl xs:text-5xl sm:text-5xl lg:text-6xl' : 'text-5xl xs:text-6xl sm:text-6xl lg:text-7xl'} font-black tracking-tight text-white font-mono`}>
-                {displayString}
+                {reading.digits}
               </strong>
             );
           })()}
-          <span className="text-xs xs:text-sm font-semibold text-cyan-400 uppercase tracking-widest mt-1">{formatSpeed(value).split(' ').slice(1).join(' ') || 'Mbps'}</span>
+          <span className="text-xs xs:text-sm font-semibold text-cyan-400 uppercase tracking-widest mt-1">{reading.unit}</span>
           <small
             className="mt-1 font-mono text-[0.62rem] xs:text-[0.68rem] font-bold uppercase tracking-[0.2em] transition-colors duration-300"
             style={{ color: phaseIndicator.accent }}

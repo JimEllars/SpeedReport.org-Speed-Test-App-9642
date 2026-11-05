@@ -6,6 +6,140 @@ notes alone.
 
 ---
 
+## 2026-11-05 — Daily review (04:35 EST)
+
+### 1. The gauge showed `0.0 Mbps` for the entire test — in the render path
+
+**Symptom:** The centre number on the gauge never moved off `0.0` during the
+download and upload phases, then jumped straight to the final result. The
+sparkline and the phase indicator behaved correctly, and the engine logged
+healthy throughput throughout, so this read as "the test is measuring nothing"
+on exactly the fast links where it mattered.
+
+**Why the 2026-11-02 fix did not cover it:** that run fixed
+`ThroughputCalculator.windowSize` (200 ms → 1000 ms), which was a *measurement*
+bug. This one is a *render* bug in `SpeedGauge`'s EMA tween, and it produces the
+identical symptom — which is why the earlier entry and the operator reports kept
+pointing at the same place.
+
+**Mechanics:** the loop assigned the current frame timestamp to `lastTime`
+*before* deriving `dt` from it:
+
+```js
+const animate = (time) => {
+  lastTime = time;                       // now === time
+  const dt = time - lastTime;            // 0, always
+  const fpsRatio = Math.min(dt / (1000 / 60), 2);        // 0
+  const dynamicAlpha = Math.min(EMA_ALPHA * fpsRatio, 1); // 0
+  const next = current + (targetValue - current) * dynamicAlpha;
+```
+
+`dynamicAlpha` was therefore always `0`, so `next === current` and
+`displayValue` never advanced. Because `Math.abs(diff) >= 0.1` stayed true, the
+`else` branch kept calling `requestAnimationFrame` — a tight loop burning a
+frame callback every 16 ms to recompute the same value, for the whole phase.
+
+**Resolution:** take the delta first, then advance the timestamp, and clamp the
+delta so a backgrounded tab cannot produce a single-frame snap on return:
+
+```js
+const dt = Math.min(Math.max(time - lastTime, 0), 250);
+lastTime = time;
+```
+
+**Caught by:** `tests/speedGauge.test.jsx`, which drives `requestAnimationFrame`
+off fake timers with an explicit monotonically increasing timestamp and asserts
+the readout converges to 490+ for a 500 Mbps target. Pre-fix it failed with
+`expected 0 to be greater than 490`.
+
+---
+
+### 2. A 1.23 Gbps link rendered as `1234.5 Gbps`
+
+**Symptom:** Any result above 1000 Mbps was displayed at 1000× its real value.
+
+**Mechanics:** the digits and the unit were produced by two different
+formatting paths that disagreed about scale:
+
+```jsx
+<strong>{value.toFixed(1)}</strong>                      {/* always Mbps magnitude */}
+<span>{formatSpeed(value).split(' ').slice(1).join(' ')}</span>  {/* switches to Gbps above 1000 */}
+```
+
+`formatSpeed` divided by 1000, `toFixed(1)` did not. Separately, the meter's
+`aria-valuenow` / `aria-valuemax` were always in Mbps and stayed correct, so
+assistive technology reported a different number from the visual readout on the
+same element.
+
+**Resolution:** one function returns both halves of the readout and callers
+render them together, so the scale factor cannot diverge again:
+
+```js
+function formatGaugeReading(mbps) {
+  const value = Number.isFinite(mbps) && mbps > 0 ? mbps : 0;
+  if (value >= 1000) return { digits: (value / 1000).toFixed(2), unit: 'Gbps' };
+  return { digits: value.toFixed(1), unit: 'Mbps' };
+}
+```
+
+**Caught by:** `tests/speedGauge.test.jsx`, which asserts a 1234.5 Mbps input
+renders `1.23` + `Gbps` and stays within the 5 Mbps rounding error of 2-dp Gbps.
+
+---
+
+### 3. `Access-Control-Allow-Origin` was wrong on the error path only
+
+**Symptom:** A caller on an origin whitelisted through `ALLOWED_ORIGINS` got a
+successful response's headers correct, but every 4xx/5xx arrived as an opaque
+browser network error with no `code` or `message` to act on.
+
+**Mechanics:** `json()` forwarded `env` to `getCorsHeaders(request, env)` but
+`errorJson()` did not — it called `getCorsHeaders(request)`. With `env`
+undefined, `getCorsHeaders` cannot see `ALLOWED_ORIGINS`, falls through to the
+strict `defaultAllowed[0]` fallback, and stamps
+`Access-Control-Allow-Origin: https://speedreport.org` on a response to
+`https://staging.speedreport.org`. The browser then discards the body.
+
+**Resolution:** `errorJson` forwards `env`. **Caught by:**
+`tests/workerHttp.test.ts` — the pre-fix assertion received
+`https://speedreport.org` where it expected the staging origin.
+
+---
+
+### 4. The Worker gate in the runbook could not be executed
+
+**Symptom:** `cd speedreport-worker && npm test` exited with
+`npm error Missing script: "test"`.
+
+**Mechanics:** the Worker package declared `dev`, `deploy`, `typecheck` and
+`types` but no `test`. Its four test files live under the root `tests/`
+directory and were only reachable through the root vitest run, so the documented
+per-package gate had never worked. A first draft of the new script also named
+`tests/reporter.test.ts` — the file is `.js` — and vitest silently ran 3 of the 4
+requested files rather than erroring, so the script is now verified by its file
+count (4) as well as its test count (38).
+
+**Resolution:** `"test": "cd .. && npx vitest run tests/worker.test.ts
+"tests/workerHttp.test.ts tests/telemetryIngress.test.ts tests/reporter.test.js"`,
+wired into the CI `validate-worker` job.
+
+---
+
+### 5. Silent degradation had no pollable surface
+
+**Symptom:** `PROSPECT_STORE` has been unbound since 2026-11-02. The DLQ and the
+per-IP lead rate limiter both no-op without it, and the only evidence was a
+`console.error({ event: "telemetry.dlq_unbound" })` buried in Worker logs. A
+`200 {"status":"healthy"}` from `/health` said nothing about it.
+
+**Resolution:** `/health` now returns `degraded` and
+`dependencies: { prospectStore, leadForwarding }` as binding *states* only —
+never the Core URL or the internal key, with a test asserting the endpoint leaks
+neither. The underlying binding still requires an operator with a Cloudflare API
+token; this only makes the gap impossible to miss.
+
+---
+
 ## 2026-11-04 — Daily review (04:35 EST)
 
 ### 1. The new Worker dry-run CI job could never have passed

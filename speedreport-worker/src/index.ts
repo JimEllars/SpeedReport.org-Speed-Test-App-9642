@@ -24,6 +24,26 @@ function isAuthorized(request: Request, adminSecret?: string): boolean {
 }
 
 /**
+ * Operational health. Its single purpose is to make silent degradation
+ * observable: the dead-letter queue and the per-IP lead rate limiter both
+ * depend on the PROSPECT_STORE binding and degrade to logged no-ops without
+ * it, which nothing outside the Worker logs could previously see. Only binding
+ * states are reported - never URLs or keys.
+ */
+function healthPayload(env: WorkerEnv) {
+  const prospectStore = env.PROSPECT_STORE ? "bound" : "unbound";
+  const leadForwarding =
+    env.AXIM_CORE_URL && env.AXIM_INTERNAL_KEY ? "configured" : "unconfigured";
+
+  return {
+    status: "healthy",
+    timestamp: Date.now(),
+    degraded: prospectStore === "unbound" || leadForwarding === "unconfigured",
+    dependencies: { prospectStore, leadForwarding },
+  };
+}
+
+/**
  * Percent-decode up to twice, so double-encoded payloads (`%252e%252e`) cannot
  * slip past a single-pass check. Returns lowercase for case-insensitive matching.
  */
@@ -111,7 +131,7 @@ export default {
     if (request.method === "GET") {
       switch (path) {
         case "/health":
-          return json({ status: "healthy", timestamp: Date.now() }, 200, request, env);
+          return json(healthPayload(env), 200, request, env);
         case "/api/meta":
           return handleMeta(request, env);
         case "/api/ping":

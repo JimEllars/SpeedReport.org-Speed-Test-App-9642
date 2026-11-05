@@ -89,7 +89,11 @@ export function errorJson(
     {
       status,
       headers: {
-        ...getCorsHeaders(request),
+        // env must be forwarded: without it getCorsHeaders falls back to the
+        // canonical origin, so a caller whitelisted via ALLOWED_ORIGINS got a
+        // mismatched Access-Control-Allow-Origin on every error and the browser
+        // threw the error body away.
+        ...getCorsHeaders(request, env),
         ...(request ? telemetryHeaders(request) : {}),
         "Content-Type": "application/json"
       }
