@@ -140,6 +140,59 @@ token; this only makes the gap impossible to miss.
 
 ---
 
+### 6. The edge screen was not in the request path
+
+**Symptom:** Post-merge probes against `speedreport.org` showed the screen
+working on the API and nowhere else:
+
+| Request | Status |
+| --- | --- |
+| `/api/ping?auto_prepend_file=php://input` | 403 |
+| `/api/meta?x=1&-d+allow_url_include=on` | 403 |
+| `/wp-admin/` | **200** |
+| `/wp-login.php` | **200** |
+| `/xmlrpc.php` | **200** |
+| `/cgi-bin/status` | **200** |
+| `/index.php` | **200** |
+| `/%252e%252e/%252e%252e/etc/passwd` | **200** |
+| `/?-d+allow_url_include%3don` | **200** |
+
+**Mechanics:** `speedreport-worker/wrangler.jsonc` declared
+
+```jsonc
+"run_worker_first": ["/api/*", "/health"],
+```
+
+Paths outside that list are handed to the static-asset router *before* the
+Worker's `fetch` handler runs, and `not_found_handling:
+"single-page-application"` answers with a 200 `index.html`. `isBlockedRequest()`
+was never invoked, so `BLOCKED_PATHS` was unreachable for every non-API path.
+
+**Why the suite was green:** `tests/worker.test.ts` calls `worker.fetch()`
+directly. It proves the handler behaves, not that the platform routes traffic to
+it. All 13 blocked-path cases passed against a production deployment that
+returned 200 for six of them. A request-handler unit test cannot cover routing
+topology — that needs a test against the deployment config.
+
+**Impact:** low today. The asset origin is Cloudflare's static store, not a PHP
+interpreter, so `/wp-admin/` returns the SPA shell and `?-d` has no CGI binary to
+reach. It matters because the documented contract did not hold, and any future
+origin proxy would inherit the hole.
+
+**Resolution:** the hostile path shapes (`/wp-admin/*`, `/wp-login.php`,
+`/wp-content/*`, `/wp-includes/*`, `/xmlrpc.php`, `/cgi-bin/*`, `/*.php`) are now
+in `run_worker_first`, so the existing screen returns 403 for them. Ordinary
+assets stay on the asset router. `tests/edgeRouting.test.ts` reads the config and
+asserts the coverage, so dropping an entry fails CI.
+
+**Residual, documented not hidden:** `/?-d+allow_url_include=on` carries its
+injection in the query string, and route patterns constrain the path only.
+Closing it requires `run_worker_first: true`, converting every static asset
+request into a billable Worker invocation — a cost decision left to the operator
+and recorded inline in `wrangler.jsonc` and in `Continued Development Plan.md`.
+
+---
+
 ## 2026-11-04 — Daily review (04:35 EST)
 
 ### 1. The new Worker dry-run CI job could never have passed

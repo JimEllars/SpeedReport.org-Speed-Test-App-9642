@@ -64,6 +64,9 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
 | 403 on all blocked patterns | ✅ 2026-11-02 |
 | Regression matrix in `tests/worker.test.ts` | ✅ 2026-11-02 |
 | CORS mirrored on error responses, not just success | ✅ 2026-11-05 |
+| Hostile path shapes actually routed to the screen (`run_worker_first`) | ✅ 2026-11-05 |
+| Routing-contract test tying `wrangler.jsonc` to the screen rules | ✅ 2026-11-05 |
+| Query-string-only vectors (`/?-d ...`) inside the screen | ⛔ operator decision |
 
 ### 4. Operational visibility and CI gates
 
@@ -103,6 +106,18 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
    `Date.now()`; a Core check that is tighter than Cloudflare's clock tolerance
    will reject valid dispatches.
 
+3. **Decide on `run_worker_first: true` for the query-string screening vector.**
+   `/?-d+allow_url_include=on` is caught by `isBlockedRequest()` but can never be
+   *routed* to it, because route patterns match the path and not the query. The
+   path-shaped vectors are all closed now. Two options:
+   - Leave as is. No CGI/PHP origin exists behind this Worker, so the argument
+     has nothing to reach. Zero cost, documented residual.
+   - Set `run_worker_first: true`. Universal screening, at the price of a billable
+     Worker invocation for every static asset request (the bundle is ~900 kB).
+
+   The engineering recommendation is to **leave it until an origin proxy exists**,
+   then switch and accept the cost.
+
 ---
 
 ## Next up (queued, not started)
@@ -120,6 +135,10 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
 - **Dependabot backlog.** Five open PRs (#67 follow-redirects, #64 undici+wrangler,
   #63 vite, #51 and #49 sharp). All checks green; waiting on maintainer triage
   because they cross the dependency graph of a pipeline that deploys on `main`.
+- **Local suite needs `pool: 'vmThreads'` or `isolate: false`.** 13 files now cost
+  ~310s and occasionally cannot start at all when the host is loaded — eight jsdom
+  forks workers died at startup during this run. CI is unaffected (37s for the
+  whole job). Worth fixing once the suite is bigger.
 
 ---
 
@@ -131,8 +150,12 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
   `1234.5 Gbps`), CORS forwarded on the `errorJson` path, `/health` now exposes
   `degraded` + dependency binding states, `npm run lint` added to the CI
   `validate` job, `speedreport-worker` gained a working `test` script wired into
-  CI, 11 new regression tests (12 files / 73 total). Step-4 roadmap items 1–5
-  audited against source and confirmed already shipped in #65/#66.
+  CI. **Follow-up:** post-merge probing showed the edge screen only fired on
+  `/api/*`, because `run_worker_first` excluded every hostile path shape — the
+  hostile paths are now routed through the Worker and a routing-contract test ties
+  `wrangler.jsonc` to the screen rules. 15 new regression tests (13 files / 88
+  total). Step-4 roadmap items 1–5 audited against source and confirmed already
+  shipped in #65/#66.
 - **2026-11-04** — Phase budget reordered (engine 10s inside a 12.5s caller
   backstop), stall surfacing as `COMPLETED_PARTIAL` with phase-specific copy,
   duplicate `network_stall` events eliminated, DLQ head-of-line blocking fixed,

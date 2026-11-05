@@ -8,7 +8,8 @@ first and timestamped with the review window that produced them.
 ## [2026-11-05] — 04:35 EST daily review
 
 A live speed readout that actually moves, a gigabit unit fix, CORS on the error
-path, and the CI gates that let the last defect through.
+path, an edge screen that reaches the paths it was written for, and the CI gates
+that let the last defect through.
 
 ### Fixed
 
@@ -29,6 +30,14 @@ path, and the CI gates that let the last defect through.
   `ALLOWED_ORIGINS` was ignored on the 4xx/5xx path and the browser discarded the
   error body — callers saw an opaque network failure with no `code` or `message`.
   `speedreport-worker/src/http.ts`
+- **The edge screening was not in the request path.** Post-merge probes against
+  production showed `403` on `/api/*` but `200` on `/wp-admin/`, `/wp-login.php`,
+  `/xmlrpc.php`, `/cgi-bin/status`, `/index.php` and a double-encoded traversal —
+  because `run_worker_first` listed only `/api/*` and `/health`, so everything
+  else was answered by the asset router (and its SPA fallback)
+  before `isBlockedRequest()` could run. The hostile path shapes are now routed
+  through the Worker; ordinary assets still bypass it.
+  `speedreport-worker/wrangler.jsonc`
 
 ### Added
 
@@ -46,6 +55,12 @@ path, and the CI gates that let the last defect through.
   to the live reading, Mbps/Gbps scaling stays consistent, phase indicators per
   leg. `tests/workerHttp.test.ts` (7): CORS mirrored on success *and* error paths,
   fallback for unknown origins, health dependency reporting and a no-leak check.
+- **A routing-contract test.** `tests/edgeRouting.test.ts` (15) reads
+  `wrangler.jsonc` and asserts every hostile path shape is covered by
+  `run_worker_first`, while ordinary asset paths are not. The existing matrix in
+  `tests/worker.test.ts` calls `worker.fetch()` directly, so it validates the
+  handler and passed happily while production served those paths from the asset
+  layer.
 
 ### Changed
 
@@ -58,10 +73,16 @@ path, and the CI gates that let the last defect through.
 
 ### Verified
 
-`npm run lint` clean · `npx vitest run` 12 files / 73 tests pass (was 10 / 62) ·
-`npm run build` 644 modules, 309.68 kB gzip · `tsc --noEmit` exit 0 ·
-Worker `npm test` 4 files / 38 tests pass · `wrangler deploy --dry-run` clean at
-32.33 KiB. Full verbatim output in `AGENTS_VERIFICATION.md`.
+`npm run lint` clean · **13 files / 88 tests pass** (was 10 / 62 at start of day;
+12 / 73 after PR #68, verified in one process) · `npm run build` 644 modules,
+309.68 kB gzip · `tsc --noEmit` exit 0 · Worker `npm test` 4 files / 38 tests pass ·
+`wrangler deploy --dry-run` clean at 32.33 KiB. Full verbatim output in
+`AGENTS_VERIFICATION.md`.
+
+The 88-test total was verified in three batches rather than one process: the host
+was at load average 16 on 2 vCPU while other sessions ran `npm ci` and `vite
+build`, so jsdom forks workers timed out at startup. See the note in
+`AGENTS_VERIFICATION.md` — recorded as batching, not as a single green run.
 
 ### Still blocked on an operator
 
@@ -69,6 +90,11 @@ Worker `npm test` 4 files / 38 tests pass · `wrangler deploy --dry-run` clean a
 this environment), so the DLQ and the lead rate limiter are still no-ops in
 production. `/health` now reports this as degraded. Five green Dependabot PRs
 (#67, #64, #63, #51, #49) are waiting on maintainer triage.
+
+One screening vector is deliberately left open and documented: a
+query-string-only injection such as `/?-d+allow_url_include=on` cannot be matched
+by a route pattern, so closing it needs `run_worker_first: true` — which moves
+every static asset request onto a billable Worker invocation. Operator decision.
 
 ---
 
