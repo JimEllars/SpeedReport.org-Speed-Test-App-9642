@@ -67,6 +67,7 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
 | Hostile path shapes actually routed to the screen (`run_worker_first`) | ✅ 2026-11-05 |
 | Routing-contract test tying `wrangler.jsonc` to the screen rules | ✅ 2026-11-05 |
 | Query-string-only vectors (`/?-d ...`) inside the screen | ⛔ operator decision |
+| Traversal substrings outside `/api/*` return 403 | ⛔ cosmetic, operator decision |
 
 ### 4. Operational visibility and CI gates
 
@@ -106,17 +107,30 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
    `Date.now()`; a Core check that is tighter than Cloudflare's clock tolerance
    will reject valid dispatches.
 
-3. **Decide on `run_worker_first: true` for the query-string screening vector.**
-   `/?-d+allow_url_include=on` is caught by `isBlockedRequest()` but can never be
-   *routed* to it, because route patterns match the path and not the query. The
-   path-shaped vectors are all closed now. Two options:
-   - Leave as is. No CGI/PHP origin exists behind this Worker, so the argument
-     has nothing to reach. Zero cost, documented residual.
-   - Set `run_worker_first: true`. Universal screening, at the price of a billable
-     Worker invocation for every static asset request (the bundle is ~900 kB).
+3. **Decide on `run_worker_first: true` for the two remaining screening gaps.**
+   Both are queued as a single decision because they share one lever.
 
-   The engineering recommendation is to **leave it until an origin proxy exists**,
-   then switch and accept the cost.
+   - `/?-d+allow_url_include=on` is caught by `isBlockedRequest()` but can never be
+     *routed* to it: route patterns match the path, not the query.
+   - Path traversal outside `/api/*` (`/%252e%252e/...`) returns the SPA shell with
+     200 rather than 403. Traversal is a substring, not a prefix, so no glob
+     captures it.
+
+   **Neither is an exposure today.** The asset origin is an uploaded manifest with
+   `not_found_handling: "single-page-application"`, so a path either resolves to a
+   real bundled asset or gets `index.html` — there is no filesystem to traverse,
+   and no CGI binary for `?-d` to reach. Both are cosmetic non-compliance with the
+   literal "always 403" wording.
+
+   Options, in order of preference:
+   - **Leave as is** (recommended until an origin proxy exists). Zero cost.
+   - `run_worker_first: true`. Universal screening, at the price of a billable
+     Worker invocation for every static asset request (~900 kB bundle).
+   - `not_found_handling: "404-page"`. Turns those 200s into 404s, but breaks SPA
+     deep links such as `/report/SR-XXXX`. Only viable with a redirect rule.
+
+   **Revisit trigger:** introduce an origin proxy, or route any request to a
+   non-asset backend, then switch to `run_worker_first: true` in the same change.
 
 ---
 

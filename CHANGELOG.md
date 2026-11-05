@@ -38,6 +38,12 @@ that let the last defect through.
   before `isBlockedRequest()` could run. The hostile path shapes are now routed
   through the Worker; ordinary assets still bypass it.
   `speedreport-worker/wrangler.jsonc`
+- **Post-deploy correction:** the follow-up above does **not** cover
+  path-traversal vectors outside `/api/*` — `/%252e%252e/%252e%252e/etc/passwd`
+  still returns 200. Traversal is a substring, not a prefix, so no route glob can
+  capture it. This is not an exposure: every such 200 is the SPA `index.html`
+  (confirmed by reading the body), because the asset origin is an uploaded
+  manifest rather than a filesystem. Recorded in `AGENTS_VERIFICATION.md`.
 
 ### Added
 
@@ -95,6 +101,9 @@ One screening vector is deliberately left open and documented: a
 query-string-only injection such as `/?-d+allow_url_include=on` cannot be matched
 by a route pattern, so closing it needs `run_worker_first: true` — which moves
 every static asset request onto a billable Worker invocation. Operator decision.
+The same applies to path-traversal substrings outside `/api/*`; those return the
+SPA shell rather than 403, which is cosmetic (no filesystem traversal is
+possible) but not literally compliant with the "always 403" wording.
 
 ---
 

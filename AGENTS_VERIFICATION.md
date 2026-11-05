@@ -378,6 +378,81 @@ in the PR #68 section and was green.
 **5. Worker deploy dry-run** — clean at 32.33 KiB / 8.80 KiB gzip with the new
 route list accepted by wrangler.
 
+CI on PR #69 confirmed the suite in a single process, which is the authority for
+the batching caveat above:
+
+```
+2026-11-05T11:30:36.3051455Z > eslint .
+2026-11-05T11:30:41.3172261Z  Test Files  13 passed (13)
+2026-11-05T11:30:41.3173151Z       Tests  88 passed (88)
+2026-11-05T11:30:45.9859265Z ✓ built in 2.93s
+```
+
+---
+
+## Run: 2026-11-05 (post-deploy verification) — PR #69 on `main`
+
+- **Commit:** `d7aea2b` (`fix(edge): route hostile path shapes into the 403 screen (#69)`)
+- **Deploy:** push-to-`main` run `42019774442` — `Validate application: success`,
+  `Deploy production Worker: success`, `Validate Worker (dry-run): skipped`.
+
+Live probes against `https://speedreport.org` after the deploy:
+
+```
+=== edge screen (expect 403) ===
+/wp-admin/                                     403
+/wp-login.php                                  403
+/xmlrpc.php                                    403
+/cgi-bin/status                                403
+/index.php                                     403
+/wp-content/plugins/shell.php                  403
+/%252e%252e/%252e%252e/etc/passwd              200
+/api/ping?auto_prepend_file=php://input        403
+/api/meta?file=../../etc/passwd                403
+
+=== legitimate traffic (expect 200/204) ===
+/                                              200
+/health                                        200
+/api/ping                                      204
+/api/meta                                      200
+/manifest.json                                 200
+/assets/index-CLM-iS62.js                      200
+```
+
+Every fixed-prefix hostile path now returns 403 and no legitimate route was
+disrupted. **The double-encoded traversal still returns 200 — the claim earlier
+in this run that all hostile path shapes were closed was overstated and is
+corrected here.**
+
+### Traversal: accurate position
+
+Traversal cannot be glob-matched, because the vector is a substring rather than a
+prefix. Probing the variants shows the platform resolves most of them, and the
+rest reach only the asset router:
+
+| Request | Status | What served it |
+| --- | --- | --- |
+| `/%2e%2e/etc/passwd` | 400 | Cloudflare edge, before the Worker |
+| `/..%2f..%2fetc/passwd` | 400 | Cloudflare edge, before the Worker |
+| `/api/..%2f..%2fetc/passwd` | 400 | Cloudflare edge, before the Worker |
+| `/foo/../../etc/passwd` | 200 | normalised to `/etc/passwd`, then the SPA shell |
+| `/a/b/../../../../etc/passwd` | 200 | normalised to `/etc/passwd`, then the SPA shell |
+| `/%252e%252e/%252e%252e/etc/passwd` | 200 | asset router, then the SPA shell |
+
+Every one of those 200 responses is `index.html` — confirmed by reading the body
+(`<!doctype html>…`), not a traversed file. There is no traversal *exposure*,
+because the asset origin is an uploaded asset manifest with
+`not_found_handling: "single-page-application"`, not a filesystem: a path either
+resolves to a real bundled asset or falls back to the SPA shell. The
+`BLOCKED_PATHS` traversal rules are enforced where they can actually be reached —
+query strings and paths that hit application code under `/api/*` — and the non-403
+responses outside that prefix are cosmetic non-compliance with the "always 403"
+wording, not an exploitable condition.
+
+Closing the cosmetic gap needs `run_worker_first: true` (all asset traffic through
+the Worker) or `not_found_handling: "404-page"` (breaks SPA deep links). Neither
+trade is worth taking today; both are recorded for the operator.
+
 ---
 
 ## Run: 2026-11-04 — 04:35 EST daily review

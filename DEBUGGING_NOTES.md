@@ -191,6 +191,31 @@ Closing it requires `run_worker_first: true`, converting every static asset
 request into a billable Worker invocation — a cost decision left to the operator
 and recorded inline in `wrangler.jsonc` and in `Continued Development Plan.md`.
 
+**Correction after deploying (`d7aea2b`):** the fix above covers every
+fixed-prefix vector, verified live — `/wp-admin/`, `/wp-login.php`,
+`/xmlrpc.php`, `/cgi-bin/status`, `/index.php`, `/wp-content/plugins/shell.php`
+all return 403 now, and legitimate routes are untouched (`/` 200, `/api/ping`
+204, assets 200).
+
+It does **not** cover path traversal outside `/api/*`.
+`/%252e%252e/%252e%252e/etc/passwd` still returns 200, and `/foo/../../etc/passwd`
+normalises to `/etc/passwd` and also returns 200. Traversal is a substring rather
+than a prefix, so no route glob can capture it.
+
+That is cosmetic, not exploitable: every one of those 200 responses is the SPA
+`index.html` (verified by reading the body), because the asset origin is an
+uploaded asset manifest with `not_found_handling: "single-page-application"`, not
+a filesystem — a path either resolves to a real bundled asset or falls back to
+the shell. There is nothing to traverse *to*. The traversal rules are enforced
+where they can be reached, in query strings and paths hitting application code
+under `/api/*`. Two further variants (`/%2e%2e/etc/passwd`,
+`/..%2f..%2fetc/passwd`) are rejected with 400 by Cloudflare before the Worker
+ever runs.
+
+Closing the cosmetic gap needs `run_worker_first: true` (all asset traffic
+through the Worker) or `not_found_handling: "404-page"` (breaks SPA deep links).
+Neither trade is worth taking today; both are recorded for the operator.
+
 ---
 
 ## 2026-11-04 — Daily review (04:35 EST)
