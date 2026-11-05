@@ -233,6 +233,151 @@ available in this environment, so the namespace could not be created here.
    pipeline that performs a real `wrangler deploy` on `main`, so a human should
    decide whether they ride together or one at a time.
 
+3. **Decide whether the query-string-only screening vector needs
+   `run_worker_first: true`.** See the follow-up run below. Deferred deliberately
+   rather than changed unilaterally, because it moves every static asset request
+   onto a billable Worker invocation.
+
+---
+
+## Run: 2026-11-05 (follow-up) — edge screening was not in the request path
+
+- **Branch:** `feat/speedreport-2026-11-05-edge-screening-routing`
+- **Base commit:** `bf4ae26` (squash of PR #68, merged at 10:30:13Z)
+
+### What the post-merge production probe found
+
+PR #68 deployed cleanly and `/health` returned the new payload as expected:
+
+```
+{"status":"healthy","timestamp":1793874733293,"degraded":true,
+ "dependencies":{"prospectStore":"unbound","leadForwarding":"configured"}}
+```
+
+Probing the deployed edge screen against real traffic then showed the screen
+only firing on `/api/*`:
+
+| Request | Status | Expected |
+| --- | --- | --- |
+| `/api/ping?auto_prepend_file=php://input` | **403** | 403 |
+| `/api/meta?x=1&-d+allow_url_include=on` | **403** | 403 |
+| `/api/meta?file=../../etc/passwd` | **403** | 403 |
+| `/wp-admin/` | 200 | 403 |
+| `/wp-login.php` | 200 | 403 |
+| `/xmlrpc.php` | 200 | 403 |
+| `/cgi-bin/status` | 200 | 403 |
+| `/index.php` | 200 | 403 |
+| `/%252e%252e/%252e%252e/etc/passwd` | 200 | 403 |
+| `/?-d+allow_url_include%3don` | 200 | 403 |
+
+**Root cause:** `speedreport-worker/wrangler.jsonc` declared
+`"run_worker_first": ["/api/*", "/health"]`. Any path outside that list is
+handed to the static-asset router *before* the Worker's `fetch` handler runs, and
+`not_found_handling: "single-page-application"` then answers with a 200
+`index.html`. `isBlockedRequest()` was never called, so `BLOCKED_PATHS` was dead
+code for every non-API path.
+
+**Why the test suite did not catch it:** `tests/worker.test.ts` invokes
+`worker.fetch()` directly. That verifies the *handler*, not the deployed routing,
+so all 13 blocked-path cases passed while production served them. This is a
+class of false assurance worth naming: unit tests on a request handler cannot
+prove the platform actually routes traffic to that handler.
+
+**Impact assessment:** low in practice today — the asset origin is Cloudflare's
+static store, not a PHP interpreter, so `/wp-admin/` returns the SPA shell and
+`?-d` has no CGI binary to reach. It matters because the documented contract
+("blocked with HTTP 403") did not hold for most paths, and any future origin
+proxy would inherit the hole.
+
+### Files modified
+
+| File | Lines (before → after) | Changed line ranges |
+| --- | --- | --- |
+| `speedreport-worker/wrangler.jsonc` | 43 → 68 | 19–45 (`run_worker_first` glob list extended with the hostile path shapes; residual documented inline) |
+| `tests/edgeRouting.test.ts` | new → 87 | whole file |
+| `CHANGELOG.md`, `AGENTS_VERIFICATION.md`, `DEBUGGING_NOTES.md`, `Continued Development Plan.md` | — | this follow-up's entries |
+
+### Fix applied
+
+`run_worker_first` now also lists `/wp-admin/*`, `/wp-login.php`,
+`/wp-content/*`, `/wp-includes/*`, `/xmlrpc.php`, `/cgi-bin/*` and `/*.php`. No
+legitimate visitor or crawler requests those paths, so routing them through the
+Worker costs nothing in practice while letting the existing screen return 403.
+Ordinary assets (`/`, `/assets/*`, `/favicon.ico`, `/manifest.json`) deliberately
+stay on the asset router.
+
+**Residual, documented not hidden:** a query-string-only vector such as
+`/?-d+allow_url_include=on` cannot be matched by a route pattern, because these
+patterns constrain the path and not the query. Covering it requires
+`run_worker_first: true`, which makes *every* static asset request a billable
+Worker invocation — a cost/latency decision for the operator, recorded in
+`Continued Development Plan.md` and inline in `wrangler.jsonc`.
+
+### Verification (verbatim)
+
+**1. New routing-contract test** — `npx vitest run tests/edgeRouting.test.ts`
+
+```
+ RUN  v5.0.3 /workspace/review/speedreport
+
+ Test Files  1 passed (1)
+      Tests  15 passed (15)
+   Start at  04:44:38
+   Duration  35.60s (transform 43%, worker 27%, tests 16%, import 15%)
+```
+
+The guard was proven non-vacuous by evaluating the same matcher against the old
+`["/api/*", "/health"]` list — 6 of the 12 representative paths were uncovered
+(`/wp-admin/`, `/wp-login.php`, `/wp-content/plugins/shell.php`, `/xmlrpc.php`,
+`/cgi-bin/status`, `/index.php`), so the test fails on the pre-fix config.
+
+**2. Lint** — `npm run lint` — no output, 0 errors 0 warnings.
+
+**3. Full unit suite** — `npx vitest run` could **not** complete in one process on
+this host during this window. The box is 2 vCPU / 3.9 GB and load average reached
+**16.44** because other sessions were simultaneously running `npm ci`, a `vite
+build` and an `rclone sync`; eight jsdom forks workers died with
+`Error: [vitest-pool-runner]: Timeout waiting for worker to respond`. That is the
+environmental failure mode already recorded as item 8 in the 2026-11-02 notes,
+not a code regression — re-running with `--no-file-parallelism` did not help
+because the timeout is at worker *startup*. The suite was therefore verified in
+three batches, covering all 13 files:
+
+```
+$ npx vitest run --no-file-parallelism tests/throughputCalculator.test.js \
+    tests/edgeRouting.test.ts tests/workerHttp.test.ts \
+    tests/telemetryIngress.test.ts tests/axim-core.test.js
+
+ Test Files  5 passed (5)
+      Tests  39 passed (39)
+   Duration  39.04s
+
+$ npx vitest run --no-file-parallelism tests/readiness.test.js \
+    tests/telemetry.test.js tests/vault.test.js tests/reporter.test.js
+
+ Test Files  4 passed (4)
+      Tests  19 passed (19)
+   Duration  148.09s
+
+$ npx vitest run --no-file-parallelism tests/speedGauge.test.jsx \
+    tests/useSpeedTest.test.js tests/useSpeedTestStall.test.js tests/worker.test.ts
+
+ Test Files  4 passed (4)
+      Tests  30 passed (30)
+   Duration  191.92s
+```
+
+Totals: **13 files / 88 tests pass**, up from 12 / 73 before this follow-up. The
+earlier single-process `npx vitest run` on the parent commit (12 files / 73 tests)
+is the last full-suite run that completed in one invocation; it is recorded above
+in the PR #68 section and was green.
+
+**4. Production build** — `npm run build` — 644 modules, `index-CLM-iS62.js`
+895.74 kB / 309.68 kB gzip, built in 5m 38s.
+
+**5. Worker deploy dry-run** — clean at 32.33 KiB / 8.80 KiB gzip with the new
+route list accepted by wrangler.
+
 ---
 
 ## Run: 2026-11-04 — 04:35 EST daily review

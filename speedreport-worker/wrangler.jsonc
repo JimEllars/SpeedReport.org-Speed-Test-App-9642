@@ -21,7 +21,35 @@
     "directory": "../dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/health"],
+    // Paths the Worker must see before the asset router does. Without an entry
+    // here the request is served (or SPA-fell-back) by the asset layer and
+    // `isBlockedRequest()` never runs - which is exactly what happened in
+    // production: `/api/*` returned 403 for hostile payloads while
+    // `/wp-admin/`, `/xmlrpc.php` and `/cgi-bin/*` returned a 200 index.html.
+    //
+    // The hostile shapes below are paths no legitimate visitor or crawler
+    // requests, so routing them here costs nothing in practice and lets the
+    // 403 screen fire. Wildcards match any character sequence, so `/*.php`
+    // covers a PHP probe at any depth.
+    //
+    // Residual: a query-string-only vector such as `/?-d+allow_url_include=on`
+    // cannot be matched here because these patterns constrain the path, not the
+    // query. Closing that requires `run_worker_first: true`, which makes every
+    // static asset request a billable Worker invocation. Not needed today: the
+    // asset origin is Cloudflare's static store, not a PHP interpreter, so there
+    // is no CGI for the argument to reach. Documented in
+    // Continued Development Plan.md for the operator to decide.
+    "run_worker_first": [
+      "/api/*",
+      "/health",
+      "/wp-admin/*",
+      "/wp-login.php",
+      "/wp-content/*",
+      "/wp-includes/*",
+      "/xmlrpc.php",
+      "/cgi-bin/*",
+      "/*.php",
+    ],
   },
   "analytics_engine_datasets": [
     {
