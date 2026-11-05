@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy --config wrangler.jsonc --keep-vars",
+    "test": "cd .. && npx vitest run tests/worker.test.ts tests/workerHttp.test.ts tests/telemetryIngress.test.ts tests/reporter.test.js",
     "typecheck": "tsc --noEmit",
     "types": "wrangler types --config wrangler.jsonc"
   },

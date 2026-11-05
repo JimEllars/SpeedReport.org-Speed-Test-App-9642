@@ -1,6 +1,6 @@
 # SpeedReport.org — Continued Development Plan
 
-_Last reconciled: 2026-11-04 (daily 04:35 EST review)_
+_Last reconciled: 2026-11-05 (daily 04:35 EST review)_
 
 This document tracks the forward roadmap for the SpeedReport.org edge engine and
 the anonymous AXiM Core ingress feed. It is reconciled at the end of every daily
@@ -31,6 +31,8 @@ those.
 | Surface stalls as `COMPLETED_PARTIAL` with phase copy | ✅ 2026-11-04 |
 | One `network_stall` event per phase (no duplicates) | ✅ 2026-11-04 |
 | Stream loops stop on `phaseSignal`, not just the caller | ✅ 2026-11-04 |
+| Gauge centre readout actually animates to the live value | ✅ 2026-11-05 |
+| Mbps/Gbps digits and unit scaled by the same factor | ✅ 2026-11-05 |
 
 **Why:** browser progress callbacks are throttled to 250–500ms. A 200ms rolling
 window emptied between callbacks on high-latency links, so the gauge snapped to
@@ -61,6 +63,16 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
 | Directory traversal screening, including double-encoded payloads | ✅ 2026-11-02 |
 | 403 on all blocked patterns | ✅ 2026-11-02 |
 | Regression matrix in `tests/worker.test.ts` | ✅ 2026-11-02 |
+| CORS mirrored on error responses, not just success | ✅ 2026-11-05 |
+
+### 4. Operational visibility and CI gates
+
+| Item | Status |
+| --- | --- |
+| `/health` reports DLQ + rate-limiter binding state (`degraded`) | ✅ 2026-11-05 |
+| `npm run lint` in the CI `validate` job | ✅ 2026-11-05 |
+| `speedreport-worker` has a working `test` script, run in CI | ✅ 2026-11-05 |
+| **Bind `PROSPECT_STORE` KV namespace in `wrangler.jsonc`** | ⛔ operator action |
 
 ---
 
@@ -81,6 +93,11 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
    performs a real `wrangler deploy` on push to `main` when `CLOUDFLARE_API_TOKEN`
    is present (it is), so a fabricated id would break the production deploy job.
 
+   Until this is done, `GET /health` reports
+   `{"degraded": true, "dependencies": {"prospectStore": "unbound"}}`. That is
+   the check to watch — it is the only pollable signal that lead buffering and
+   rate limiting are inactive.
+
 2. **Confirm the Core clock-skew window** matches the `X-Axim-Timestamp` contract
    enforced in `axim-core` (<5 min drift). The satellite signs with
    `Date.now()`; a Core check that is tighter than Cloudflare's clock tolerance
@@ -90,28 +107,32 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
 
 ## Next up (queued, not started)
 
-- **CI deploy gating needs an operator decision.** Production deploys are now
-  gated to `push` on `main`, and PRs run a typecheck + `wrangler deploy --dry-run`
-  instead. If preview deploys per PR are wanted later, they need a distinct Worker
-  name (e.g. `speedreport-edge-preview`) rather than reusing the production one.
-- **`validate` job does not run lint.** `.github/workflows/deploy-cloudflare.yml`
-  runs `npm run test` and `npm run build`, but not `npm run lint` — which is how a
-  parse error in a new test file reached the tree unnoticed this run. Adding
-  `npm run lint` to `validate` is a one-line change; queued rather than bundled
-  with today's fix set so a lint failure cannot block the rest of the pipeline.
+- **`isolate: false` for vitest.** jsdom environment creation is still ~72% of
+  suite runtime (12 files, one environment each, ~15s startup apiece — 310s wall
+  clock for 73 tests). Sharing workers would cut most of that, but only once the
+  suite is large enough to justify loosening per-file isolation. The suite got
+  slower this run (2 new files), so it moves up the queue.
 - **Bundle size.** The main chunk is ~896 kB minified (310 kB gzip). Route-level
   code splitting for the report/PDF path is the obvious win.
-- **`isolate: false` for vitest.** jsdom environment creation is still ~65% of
-  suite runtime (10 workers spawned, one per file, ~23s startup each). Sharing
-  workers would cut roughly 150s, but only once the suite is large enough to
-  justify loosening per-file isolation.
-- **Dependabot backlog.** Four open PRs (undici/wrangler, vite, sharp ×2) are
-  waiting. They are independent of this work and should be triaged separately.
+- **`ALLOWED_ORIGINS` accepts any `*.pages.dev` origin.** Convenient for preview
+  deploys, but it means any Cloudflare Pages project can read API responses. Tighten
+  to an explicit preview allowlist once preview deployments are settled.
+- **Dependabot backlog.** Five open PRs (#67 follow-redirects, #64 undici+wrangler,
+  #63 vite, #51 and #49 sharp). All checks green; waiting on maintainer triage
+  because they cross the dependency graph of a pipeline that deploys on `main`.
 
 ---
 
 ## Done log
 
+- **2026-11-05** — Gauge centre readout un-frozen (EMA `dt` computed before
+  `lastTime` was overwritten; the number had never moved during a test), Gbps unit
+  scaling made consistent with the digits (1.23 Gbps no longer rendered as
+  `1234.5 Gbps`), CORS forwarded on the `errorJson` path, `/health` now exposes
+  `degraded` + dependency binding states, `npm run lint` added to the CI
+  `validate` job, `speedreport-worker` gained a working `test` script wired into
+  CI, 11 new regression tests (12 files / 73 total). Step-4 roadmap items 1–5
+  audited against source and confirmed already shipped in #65/#66.
 - **2026-11-04** — Phase budget reordered (engine 10s inside a 12.5s caller
   backstop), stall surfacing as `COMPLETED_PARTIAL` with phase-specific copy,
   duplicate `network_stall` events eliminated, DLQ head-of-line blocking fixed,

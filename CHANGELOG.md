@@ -5,6 +5,73 @@ first and timestamped with the review window that produced them.
 
 ---
 
+## [2026-11-05] — 04:35 EST daily review
+
+A live speed readout that actually moves, a gigabit unit fix, CORS on the error
+path, and the CI gates that let the last defect through.
+
+### Fixed
+
+- **The gauge was frozen at `0.0` for the whole test.** The EMA animation loop
+  overwrote `lastTime` with the current frame timestamp *before* deriving `dt`
+  from it, so `dt` was unconditionally `0`, `dynamicAlpha` collapsed to `0`, and
+  the centre readout never left its initial value while the rAF loop rescheduled
+  forever. The engine was reporting a healthy live speed the entire time; only
+  the number on screen was dead. Same operator-visible symptom as the 2026-11-02
+  window bug, but in the render path, which is why widening the window did not
+  clear it. `src/components/SpeedGauge.jsx`
+- **A 1.23 Gbps link rendered as `1234.5 Gbps`.** The digits were formatted in
+  Mbps while the unit was derived separately and switched to Gbps above 1000, so
+  every circuit over a gigabit was overstated by 1000×. Both now come from one
+  `formatGaugeReading()` call and cannot diverge. `src/components/SpeedGauge.jsx`
+- **`Access-Control-Allow-Origin` was wrong on every error response.** `errorJson`
+  built its CORS headers without `env`, so an origin whitelisted via
+  `ALLOWED_ORIGINS` was ignored on the 4xx/5xx path and the browser discarded the
+  error body — callers saw an opaque network failure with no `code` or `message`.
+  `speedreport-worker/src/http.ts`
+
+### Added
+
+- **`GET /health` now reports dependency state.** `degraded` plus
+  `dependencies: { prospectStore, leadForwarding }` as `bound`/`unbound` and
+  `configured`/`unconfigured` — binding states only, never the Core URL or the
+  internal key. The `PROSPECT_STORE` gap silently disabled the DLQ and the per-IP
+  lead rate limiter, and nothing outside the Worker logs said so.
+  `speedreport-worker/src/index.ts`
+- **`speedreport-worker` has a `test` script.** The runbook step
+  `cd speedreport-worker && npm test` previously died with
+  `npm error Missing script: "test"`, leaving the Worker's 38 tests reachable
+  only through the root runner. `speedreport-worker/package.json`
+- **11 regression tests.** `tests/speedGauge.test.jsx` (4): centre value converges
+  to the live reading, Mbps/Gbps scaling stays consistent, phase indicators per
+  leg. `tests/workerHttp.test.ts` (7): CORS mirrored on success *and* error paths,
+  fallback for unknown origins, health dependency reporting and a no-leak check.
+
+### Changed
+
+- **CI runs lint first.** `validate` ran `npm run test` and `npm run build` only,
+  which is how a `ecmaVersion` parse error reached the tree on 2026-11-04. Lint is
+  now the first gate so a syntax error fails in seconds instead of after a
+  4-minute build.
+- **CI runs the Worker test suite.** `validate-worker` now runs `npm test`
+  alongside `tsc --noEmit` and the deploy dry-run. `.github/workflows/deploy-cloudflare.yml`
+
+### Verified
+
+`npm run lint` clean · `npx vitest run` 12 files / 73 tests pass (was 10 / 62) ·
+`npm run build` 644 modules, 309.68 kB gzip · `tsc --noEmit` exit 0 ·
+Worker `npm test` 4 files / 38 tests pass · `wrangler deploy --dry-run` clean at
+32.33 KiB. Full verbatim output in `AGENTS_VERIFICATION.md`.
+
+### Still blocked on an operator
+
+`PROSPECT_STORE` remains unbound in `wrangler.jsonc` (no Cloudflare API token in
+this environment), so the DLQ and the lead rate limiter are still no-ops in
+production. `/health` now reports this as degraded. Five green Dependabot PRs
+(#67, #64, #63, #51, #49) are waiting on maintainer triage.
+
+---
+
 ## [2026-11-04] — 04:35 EST daily review
 
 Phase-budget ordering, stall surfacing, CI deploy gating, and a DLQ queue that
