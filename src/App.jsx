@@ -12,6 +12,7 @@ import ReportShareCard from './components/ReportShareCard';
 import ReportComparisonCard from './components/ReportComparisonCard';
 import DiagnosticsSummary from './components/DiagnosticsSummary';
 import FiberLeadCard from './components/FiberLeadCard';
+import FailureBanner from './components/FailureBanner';
 import { useLocalVault } from './hooks/useLocalVault';
 import { useSpeedTest } from './hooks/useSpeedTest';
 import { readReportFromUrl } from './utils/reportShareLinks';
@@ -131,12 +132,11 @@ useEffect(() => {
           <div className="metrics-column">
             <MetricsGrid metrics={test.metrics} />
 
-            {test.error && (
-              <div className="error-banner" role="alert">
-                <strong>Edge engine unavailable.</strong> {test.error} Deploy the
-                included Worker or configure <code>VITE_API_BASE</code>.
-              </div>
-            )}
+            <FailureBanner
+              failure={test.failure}
+              stalledPhase={test.stalledPhase}
+              message={test.error}
+            />
 
             <ISPDetailsCard meta={displayedMeta} metrics={displayedMetrics} />
           </div>

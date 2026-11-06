@@ -732,6 +732,24 @@ main {
   color: #ffcf89;
 }
 
+/* A partial result is information, not an alarm: the report below it is real.
+   Amber for "something degraded", so it reads as a caveat rather than a fault. */
+.error-banner--partial {
+  color: #cbd5e1;
+  background: rgba(30, 58, 95, .45);
+  border-color: rgba(148, 163, 184, .28);
+}
+
+.error-banner__detail {
+  opacity: .75;
+}
+
+.error-banner__devhint {
+  display: block;
+  margin-top: 6px;
+  opacity: .8;
+}
+
 footer {
   display: flex;
   align-items: center;

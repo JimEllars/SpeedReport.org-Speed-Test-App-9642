@@ -34,7 +34,12 @@ export function useSpeedTest(onComplete) {
   const [metrics, setMetrics] = useState(initialMetrics);
   const [meta, setMeta] = useState(null);
   const [samples, setSamples] = useState([]);
+  // The message shown to the reader, and the failure that produced it. Both are
+  // kept because the banner has to explain *why* a phase failed, not just that
+  // it did -- see utils/failure.js.
   const [error, setError] = useState('');
+  const [failure, setFailure] = useState(null);
+  const [stalledPhase, setStalledPhase] = useState(null);
 
   const rafRef = useRef(null);
   const latestData = useRef(null);
@@ -76,6 +81,8 @@ export function useSpeedTest(onComplete) {
     setMetrics(initialMetrics);
     setSamples([]);
     setError('');
+    setFailure(null);
+    setStalledPhase(null);
   }, [state]);
 
   const start = useCallback(async () => {
@@ -108,6 +115,8 @@ export function useSpeedTest(onComplete) {
     };
 
     setError('');
+    setFailure(null);
+    setStalledPhase(null);
     setMeta(null);
     setMetrics(initialMetrics);
     setSamples([]);
@@ -218,10 +227,12 @@ export function useSpeedTest(onComplete) {
       setMetrics(completeMetrics);
       setState(partialFailure ? STATES.COMPLETED_PARTIAL : STATES.COMPLETE);
       if (partialFailure) {
-        const stalledPhase = dlRes.stalled ? 'download' : ulRes.stalled ? 'upload' : null;
+        const phase = dlRes.stalled ? 'download' : ulRes.stalled ? 'upload' : null;
+        setStalledPhase(phase);
+        setFailure({ phase, reason: phase ? `Network stall detected during ${phase}` : 'Partial completion' });
         setError(
-          stalledPhase
-            ? `Network stall detected during ${stalledPhase}; measured throughput may understate capacity.`
+          phase
+            ? `Network stall detected during ${phase}; measured throughput may understate capacity.`
             : 'Test completed partially due to network instability.'
         );
       }
@@ -235,6 +246,7 @@ export function useSpeedTest(onComplete) {
         return;
       }
 
+      setFailure({ phase: null, reason });
       setError(reason.message || 'The test could not be completed.');
       setState(STATES.ERROR);
     } finally {
@@ -252,6 +264,8 @@ export function useSpeedTest(onComplete) {
     meta,
     samples,
     error,
+    failure,
+    stalledPhase,
     start,
     cancel
   };
