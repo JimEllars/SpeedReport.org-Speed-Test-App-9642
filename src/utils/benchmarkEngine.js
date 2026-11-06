@@ -225,6 +225,16 @@ export class ThroughputCalculator {
   checkStall() {
     return (performance.now() - this.lastBytesTime) > STALL_THRESHOLD_MS;
   }
+
+  /**
+   * Record that the transport is demonstrably alive without counting bytes.
+   * Browsers that emit no upload progress events give no byte signal while a
+   * payload is in flight, so a slow-but-healthy upload would otherwise be torn
+   * down as a stall purely because the byte counter sat still.
+   */
+  markActivity() {
+    this.lastBytesTime = performance.now();
+  }
 }
 
 // Download Worker
@@ -422,16 +432,30 @@ function getUploadPayload(size) {
 
 // We need a custom upload client to track live progress since fetch API does not support upload progress tracking
 // XMLHttpRequest supports it. Let's use XHR wrapped in a Promise.
+//
+// Resolves with `{ bytes, ms }` - the size actually sent and the wall time it
+// took - so the caller can size the next rung of the ladder against measured
+// throughput instead of guessing.
 function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    const started = performance.now();
+    // Read the length before dispatching the request: an engine that detaches
+    // the buffer on send would zero `payload.byteLength` and silently credit
+    // nothing - the same class of bug this function exists to fix.
+    const byteLength = payload.byteLength;
 
     const cleanup = () => {
       if (phaseSignal) phaseSignal.removeEventListener('abort', onAbort);
       xhr.removeEventListener('load', onLoad);
       xhr.removeEventListener('error', onError);
       xhr.removeEventListener('abort', onXhrAbort);
-      if (xhr.upload) xhr.upload.removeEventListener('progress', onProgress);
+      if (xhr.upload) {
+        xhr.upload.removeEventListener('loadstart', onUploadStart);
+        xhr.upload.removeEventListener('progress', onProgress);
+        xhr.upload.removeEventListener('load', onBodySent);
+        xhr.upload.removeEventListener('loadend', onBodySent);
+      }
     };
 
     const onAbort = () => {
@@ -447,13 +471,46 @@ function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
       phaseSignal.addEventListener('abort', onAbort);
     }
 
-    let lastLoaded = 0;
+    // High-water mark of bytes already credited for THIS request. `progress`
+    // and the response credit overlap - a browser may report partial progress
+    // and then a completed request - so every credit is expressed as "advance
+    // to at most N bytes" and the mark makes that idempotent.
+    let creditedBytes = 0;
+
+    const creditUpTo = (loaded) => {
+      if (!Number.isFinite(loaded)) return;
+      const delta = loaded - creditedBytes;
+      if (delta <= 0) return;
+      creditedBytes = loaded;
+      calculator.addBytes(delta);
+    };
+
+    // A request that has begun carrying bytes is evidence of life, even while
+    // the byte counter stands still waiting for the first progress event.
+    const onUploadStart = () => {
+      if (phaseSignal?.aborted) return;
+      calculator.markActivity();
+    };
 
     const onProgress = (event) => {
       if (phaseSignal?.aborted) return;
-      const loadedBytes = event.loaded - lastLoaded;
-      calculator.addBytes(loadedBytes);
-      lastLoaded = event.loaded;
+      creditUpTo(event.loaded);
+    };
+
+    // Firefox never fires `progress` on XMLHttpRequestUpload for a buffered
+    // body: a 512 KiB POST goes `loadstart` -> `load` (loaded = 524288) ->
+    // `loadend` and nothing else. Crediting only `progress` therefore scored
+    // every Firefox upload as zero transferred bytes, which pinned the live
+    // readout at 0.0 Mbps and let the 6s stall detector tear the phase down as
+    // if the link were dead. Chrome does emit `progress`, so the phase passed
+    // on Chrome and failed for an entire browser.
+    //
+    // The body being fully sent is not the same as the edge accepting it, so
+    // this only marks activity; the bytes are credited when the response proves
+    // they were accepted. Crediting here instead inflated a rejected upload.
+    const onBodySent = () => {
+      if (phaseSignal?.aborted) return;
+      calculator.markActivity();
     };
 
     const onLoad = () => {
@@ -463,7 +520,11 @@ function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
       // and inflated the throughput reading.
       const status = xhr.status;
       if (status >= 200 && status < 300) {
-        resolve();
+        // Credits whatever `progress` did not already account for, which is the
+        // whole payload in Firefox and nothing in a browser that reported every
+        // byte. Reaching a 2xx means the edge received all of it.
+        creditUpTo(byteLength);
+        resolve({ bytes: byteLength, ms: performance.now() - started });
         return;
       }
       reject(new Error(`Upload endpoint rejected payload (HTTP ${status})`));
@@ -471,7 +532,10 @@ function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
     const onError = () => { cleanup(); reject(new Error('Upload endpoint unavailable')); };
     const onXhrAbort = () => { cleanup(); reject(new DOMException('The diagnostic was cancelled.', 'AbortError')); };
 
+    xhr.upload.addEventListener('loadstart', onUploadStart);
     xhr.upload.addEventListener('progress', onProgress);
+    xhr.upload.addEventListener('load', onBodySent);
+    xhr.upload.addEventListener('loadend', onBodySent);
     xhr.addEventListener('load', onLoad);
     xhr.addEventListener('error', onError);
     xhr.addEventListener('abort', onXhrAbort);
@@ -535,12 +599,25 @@ export async function measureUpload(onProgress = () => {}, signal) {
         Math.min(ladderIndex, UPLOAD_CHUNK_LADDER_BYTES.length - 1)
       ];
 
-      await uploadPayloadWithProgress(getUploadPayload(size), calculator, phaseSignal);
+      const { bytes, ms } = await uploadPayloadWithProgress(
+        getUploadPayload(size), calculator, phaseSignal
+      );
 
       if (signal?.aborted || phaseFinished) return;
 
-      if (ladderIndex < UPLOAD_CHUNK_LADDER_BYTES.length - 1) {
-        ladderIndex += 1;
+      // Climb the ladder only when the measured transfer of this rung says the
+      // next one still finishes comfortably inside the stall window. Blind
+      // climbing walked a 768 kbps uplink onto the 4 MiB rung, where a single
+      // request outlasts STALL_THRESHOLD_MS and the phase was torn down as
+      // stalled even though the link was healthy the whole time.
+      const nextIndex = Math.min(ladderIndex + 1, UPLOAD_CHUNK_LADDER_BYTES.length - 1);
+      if (nextIndex !== ladderIndex) {
+        const nextSize = UPLOAD_CHUNK_LADDER_BYTES[nextIndex];
+        const elapsed = Math.max(ms, 1);
+        const projectedMs = (elapsed * nextSize) / Math.max(bytes, 1);
+        if (projectedMs <= STALL_THRESHOLD_MS / 2) {
+          ladderIndex = nextIndex;
+        }
       }
 
       // Slow links do not benefit from piling on streams; shed the extra one.
