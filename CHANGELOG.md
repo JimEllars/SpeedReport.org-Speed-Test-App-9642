@@ -5,6 +5,42 @@ first and timestamped with the review window that produced them.
 
 ---
 
+## [2026-11-06] — 05:55 EST follow-up (same window)
+
+Correcting an artifact the 2026-11-06 fix introduced in production, found by
+testing the deployed build rather than the diff.
+
+### Fixed
+
+- **Upload read `419.4 Mbps` on a 64.3 Mbps link.** The previous fix credited a
+  whole payload at one instant on the 2xx response, so the rolling window held a
+  single chunk and divided it by its 10ms floor: `524288 × 8 / 0.01 = 419.4 Mbps`
+  — exactly the number production displayed, and the 90th-percentile history then
+  adopted that spike as the final result. Batch credits are now distributed over
+  the request's measured duration in ~100ms slices
+  (`ThroughputCalculator.addBatch(bytes, elapsedMs)`), so both the live window
+  and the history read the observed rate. `src/utils/benchmarkEngine.js`
+
+### Added
+
+- **3 calculator tests + 1 upload test.** `tests/throughputCalculator.test.js`:
+  a 512 KiB / 1900ms batch reads ~2.2 Mbps rather than 419, five repeated batches
+  hold the observed rate in the percentile history, and `totalBytesInWindow`
+  stays equal to the sum of the chunk list after a batch (the prune now runs
+  inside `addBatch`). `tests/benchmarkUpload.test.js`: a single-request-per-stream
+  link reports 2–20 Mbps, not the window floor. The fake `XMLHttpRequest` now
+  spreads Chrome-style `progress` events across the request instead of firing
+  them in one burst.
+
+### Verified
+
+`npm run lint` clean · `tests/throughputCalculator.test.js` 7/7 ·
+`tests/benchmarkUpload.test.js` 7/7 · `npm run build` 644 modules, 309.99 kB gzip ·
+full isolated suite and CI on the pull request. Verbatim output in
+`AGENTS_VERIFICATION.md`.
+
+---
+
 ## [2026-11-06] — 04:35 EST daily review
 
 Upload measures a real number in Firefox again, the chunk ladder refuses to

@@ -37,6 +37,7 @@ those.
 | Request-level byte credit made idempotent (progress + completion cannot double count) | ✅ 2026-11-06 |
 | Ladder climbs only when the next rung projects inside half the stall window | ✅ 2026-11-06 |
 | Upload in flight counts as activity, so a slow-but-alive link is not stalled | ✅ 2026-11-06 |
+| Bulk byte credit spread over the request duration (~100ms slices) | ✅ 2026-11-06 |
 
 **Why:** browser progress callbacks are throttled to 250–500ms. A 200ms rolling
 window emptied between callbacks on high-latency links, so the gauge snapped to
@@ -190,6 +191,15 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
 ---
 
 ## Done log
+
+- **2026-11-06 (follow-up)** — The first upload fix credited each payload at one
+  instant, so production read `419.4 Mbps` on a 64 Mbps link (the rolling
+  window's 10ms floor applied to a single 512 KiB chunk, adopted as the result by
+  the 90th-percentile history). Bulk credits are now distributed across the
+  request's measured duration in ~100ms slices via
+  `ThroughputCalculator.addBatch()`, with `pruneWindow()` extracted so the window
+  total stays in step with the chunk list. 4 new tests, and the fake
+  `XMLHttpRequest` spreads Chrome `progress` events realistically.
 
 - **2026-11-06** — Upload no longer reports `0.0 Mbps` in Firefox: bytes are
   credited on the 2xx response instead of only from `XMLHttpRequestUpload`

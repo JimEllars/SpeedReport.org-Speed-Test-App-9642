@@ -7,6 +7,84 @@ actually run against the commit it claims to cover.
 
 ---
 
+## Run: 2026-11-06 — 05:55 EST follow-up to PR #72
+
+- **Repository:** `JimEllars/SpeedReport.org-Speed-Test-App-9642`
+- **Base commit:** `2ac90a8` (`fix(benchmark): credit upload bytes on the 2xx response, not only on progress (#72)`)
+- **Branch:** `fix/speedreport-2026-11-06-upload-rate-spread`
+- **Trigger:** live production test in Firefox 158 after the #72 deploy returned
+  `Download 64.3 Mbps` · `Upload 419.4 Mbps`. Not `0.0` any more, but 419 Mbps is
+  the rolling window's 10ms floor applied to a single 512 KiB chunk
+  (`524288 × 8 / 0.01 = 419.4`), and `getFinalSpeedMbps()` took it as the result.
+
+### Files modified
+
+| File | Lines (before → after) | Changed line ranges |
+| --- | --- | --- |
+| `src/utils/benchmarkEngine.js` | 683 → 738 | 168–176 (`addBytes` delegates to the extracted prune), 178-replaced (`pruneWindow()`), 180–222 (`addBatch(bytes, elapsedMs)` slices a bulk credit across the request), 561–575 (2xx credits the remainder through `addBatch` instead of `addBytes`) |
+| `tests/throughputCalculator.test.js` | 63 → 100 | +3 tests: batch credit reads the observed rate, repeated batches hold it, window total stays equal to the chunk sum |
+| `tests/benchmarkUpload.test.js` | 198 → 232 | fake `XMLHttpRequest` spreads Chrome `progress` events across the request; +1 test bounding a single-request-per-stream link to 2–20 Mbps |
+| `CHANGELOG.md`, `AGENTS_VERIFICATION.md`, `DEBUGGING_NOTES.md`, `Continued Development Plan.md` | — | this run's entries |
+
+### Verification (verbatim)
+
+`npm run lint` — clean:
+
+```
+> speedreport-org@1.0.0 lint
+> eslint .
+```
+
+`npx vitest run tests/throughputCalculator.test.js`:
+
+```
+ ✓ ThroughputCalculator > retains chunks across a 400ms progress gap (1000ms window) 156ms
+ ✓ ThroughputCalculator > reports a positive live speed across a 400ms gap instead of collapsing to zero 1ms
+ ✓ ThroughputCalculator > flags a stall only after STALL_THRESHOLD_MS without new bytes 1ms
+ ✓ ThroughputCalculator > spreads a batch credit over the request duration instead of one instant 1ms
+ ✓ ThroughputCalculator > keeps repeated batch credits at the observed rate 1ms
+ ✓ ThroughputCalculator > does not leave the window total out of step with the chunk list 0ms
+ ✓ phase budgets > keeps the engine graceful budget strictly below the caller hard-abort backstop 75ms
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+```
+
+`npx vitest run tests/benchmarkUpload.test.js`:
+
+```
+ ✓ byte accounting > credits bytes when the browser emits only loadstart/load/loadend (Firefox) 1037ms
+ ✓ byte accounting > credits the same bytes once when progress and completion events both fire (Chrome) 2566ms
+ ✓ byte accounting > keeps a non-2xx rejection out of the throughput reading 638ms
+ ✓ byte accounting > reports the observed rate for a single-request link, not the window floor 239ms
+ ✓ chunk ladder > starts every stream at 512 KiB 3ms
+ ✓ chunk ladder > climbs the ladder once the measured rung fits inside the stall budget 477ms
+ ✓ chunk ladder > holds the rung when the next one could not finish before the stall window 91ms
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+```
+
+`npm run build`:
+
+```
+dist/.assetsignore                0.02 kB
+dist/wrangler.json                1.08 kB │ gzip:   0.56 kB
+dist/index.html                   3.26 kB │ gzip:   1.10 kB
+dist/assets/index-DvneVEv9.css   26.95 kB │ gzip:   7.13 kB
+dist/assets/index-D_KBJpbH.js   896.84 kB │ gzip: 309.99 kB
+✓ built in 4m 24s
+```
+
+### A verification run that did **not** count
+
+A local `wrangler dev` browser pass was attempted and returned
+`0.0 Mbps` on every phase with a download stall. The host was at load average
+21.5 on 2 vCPU and the Worker answered `/api/ping` in 4.4–9.8s, so the ping
+phase exceeded its 12s budget before any measurement began. Discarded as
+invalid rather than recorded as a pass; the live edge verification runs after
+the merge deploy instead.
+
+---
+
 ## Run: 2026-11-06 — 04:35 EST daily review
 
 - **Repository:** `JimEllars/SpeedReport.org-Speed-Test-App-9642`
