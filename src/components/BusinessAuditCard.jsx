@@ -54,11 +54,14 @@ export default function BusinessAuditCard({ metrics, complete, reportId }) {
     sendAnonymousTelemetry(payload);
   };
 
+  // Capability-first rows: each answers "what can I actually do with this link?"
+  // in words a household and a fifty-seat office both understand. The enterprise
+  // contract framing lives in the SLA card below, where the reader opts into it.
   const rows = [
-    [FiPhoneCall, 'VoIP & telephony', complete ? `${audit.calls}+ simultaneous HD calls` : 'Awaiting connection analysis'],
-    [FiVideo, 'Video conferencing', complete ? (audit.strongVideo ? '4K multi-stream ready' : 'HD use with limitations') : 'Zoom, Teams & Meet readiness'],
-    [FiCloud, 'Cloud workloads', complete ? `100 GB in ${formatDuration(audit.uploadSeconds(100))} · 1 TB in ${formatDuration(audit.uploadSeconds(1000))} · 10 TB in ${formatDuration(audit.uploadSeconds(10000))}` : 'Upload feasibility analysis'],
-    [FiUsers, 'Office capacity', complete ? `Est. ${audit.employees} active employees` : 'Concurrent workforce estimate']
+    [FiPhoneCall, 'Calls & voice', complete ? `${audit.calls}+ simultaneous HD calls` : 'Awaiting connection analysis'],
+    [FiVideo, 'Video & streaming', complete ? (audit.strongVideo ? '4K multi-stream ready' : 'HD viewing with some limits') : 'Meeting and streaming readiness'],
+    [FiCloud, 'Large uploads', complete ? `100 GB in ${formatDuration(audit.uploadSeconds(100))} · 1 TB in ${formatDuration(audit.uploadSeconds(1000))} · 10 TB in ${formatDuration(audit.uploadSeconds(10000))}` : 'Upload time projections'],
+    [FiUsers, 'Devices & people online at once', complete ? `Comfortably around ${audit.employees} active users` : 'Concurrent usage estimate']
   ];
 
   let slaResult = null;
@@ -73,7 +76,7 @@ export default function BusinessAuditCard({ metrics, complete, reportId }) {
     <section className="panel audit-panel p-4 sm:p-6 h-full flex flex-col" style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '2rem' }}>
       <div>
         <div className="panel-heading flex justify-between items-start mb-4">
-          <div><span className="eyebrow">Operational assessment</span><h2>Business readiness</h2></div>
+          <div><span className="eyebrow">What this link can do</span><h2>Connection capability</h2></div>
           <div className={`grade ${complete ? 'ready' : ''}`}>{complete ? audit.grade : 'Pending'}</div>
         </div>
         <div className="audit-list" style={{ overflowX: 'hidden' }}>
@@ -102,7 +105,7 @@ export default function BusinessAuditCard({ metrics, complete, reportId }) {
                 className="text-sm font-semibold text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-2"
               >
                 <SafeIcon icon={FiFileText} />
-                Request full IT readiness audit
+                Request the full readiness report
               </button>
             )}
           </div>
@@ -112,8 +115,8 @@ export default function BusinessAuditCard({ metrics, complete, reportId }) {
       {complete && (
         <div className="border-t border-slate-800 pt-6">
           <div className="mb-4">
-            <span className="eyebrow">Compliance check</span>
-            <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>Enterprise SLA Verification</h2>
+            <span className="eyebrow">Contract check · optional</span>
+            <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>Compare against your service contract</h2>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -125,9 +128,9 @@ export default function BusinessAuditCard({ metrics, complete, reportId }) {
                   onChange={(e) => setSelectedTier(e.target.value)}
                   style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', background: '#1e293b', color: 'white', border: '1px solid #334155' }}
                 >
-                  <option value="Tier 1: Dedicated Internet Access (DIA)">Tier 1: Dedicated Internet Access (DIA)</option>
-                  <option value="Tier 2: Business Broadband (Coax/Fiber)">Tier 2: Business Broadband (Coax/Fiber)</option>
-                  <option value="Tier 3: Remote Workforce / Best Effort">Tier 3: Remote Workforce / Best Effort</option>
+                  <option value="Tier 1: Dedicated Internet Access (DIA)">Dedicated circuit (DIA) — guaranteed bandwidth</option>
+                  <option value="Tier 2: Business Broadband (Coax/Fiber)">Business broadband (coax/fiber) — shared</option>
+                  <option value="Tier 3: Remote Workforce / Best Effort">Home or best-effort service</option>
                 </select>
               </div>
               <div style={{ flex: 1, minWidth: '200px' }}>

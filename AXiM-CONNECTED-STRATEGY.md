@@ -5,6 +5,13 @@
 **Scope:** SpeedReport.org (primary asset), crossing into AXiM Core, AXiM Support, and the
 Business Development engine. **Internal only — never publish.**
 
+> **Positioning, settled 2026-11-05:** SpeedReport is a **universal, modern, reliable speed
+> test and report app** — commercial *and* residential, and deliberately neutral about which.
+> It does not ask whether you are "a business". Audience is inferred at most as a scoring
+> hint (`AUDIENCES.COMMERCIAL`) that weights urgency; it never gates a lead, never changes
+> routing, and defaults to `UNIVERSAL`. Any copy, threshold or fairness rule that requires the
+> reader to be an IT department is a defect. See §9.
+
 ---
 
 ## 0. The one-paragraph thesis
@@ -120,6 +127,19 @@ lead engine.
 
 ---
 
+## 3.3 Pipeline order: ingest first, forward last
+
+**All leads are ingested into AXiM Core first.** Core verifies, enriches, scores, qualifies and
+persists. Only then does a connector format and forward the result to an external partner. The
+satellite is a producer with no knowledge of partners; Core is the system of record.
+
+That ordering is what converts the channel from a series of point integrations into a reusable
+asset: a new partner becomes one connector, withdrawal becomes one column, and the payout claim
+becomes a query rather than a memory exercise. The full stage contract, state machine, schema
+extension and connector interface are in **`docs/lead-pipeline.md`** — that document governs how
+this strategy is implemented, and it is deliberately written so the pipeline can be built,
+deployed and observed in production while entirely dormant.
+
 ## 4. The engine: five gates, in order
 
 Every visitor passes through these. The design principle is that **each gate can only
@@ -183,7 +203,11 @@ The engine is dark until a coverage feed exists, because turning on deal cards w
 The engine is only worth building if the other satellites consume it. Each link below has
 a named contract, so the projects connect by interface rather than by vibes.
 
-### 5.1 AXiM Core — the ledger (highest priority)
+### 5.1 AXiM Core — the ledger and the enrichment host (highest priority)
+
+Core is not only the ledger; per §3.3 it is where enrichment runs and where the only
+authoritative `payable` decision is made. Implementation detail lives in
+`docs/lead-pipeline.md`; the columns below are the minimum contract.
 
 Extend `leads` (or add `lead_routes`) with:
 
@@ -291,10 +315,11 @@ number, and it must be the real one.
 | **P0** | Bind `PROSPECT_STORE` (**operator, 5 min**) | — | Leads stop being dropped; flood protected |
 | **P0** | Resolve **D2** — where `/api/v1/leads/telemetry` actually lands | — | The pipeline stops being theatre |
 | **P1** | **This PR**: classification/score/coverage/offer engine + `/api/serviceability` | — | The reusable core; zero user-visible risk |
-| **P2** | Serviceability feed into KV + deal card reads the engine | P1, partner feed | Real offers on real coverage |
-| **P3** | Consent capture (name, email, ZIP, checkbox, version) + `payable` gating | P2 | Genuinely routable leads |
-| **P4** | Core ledger schema + partner webhook / reconciliation import | P3 | Attribution; the sentence that sells the next partner |
-| **P5** | Route to partner (SARA Plus manual, then API) | P4 | First dollar from the channel |
+| **P2** | Serviceability feed into KV + deal card reads the engine (**dormant until the ZIP feed lands**) | P1, partner feed | Real offers on real coverage |
+| **P3** | Consent capture + `payable` gating (**blocked on counsel review of `docs/consent-language.md`**) | P2 | Genuinely routable leads |
+| **P4** | Core enrichment pipeline + ledger schema (**buildable now, inert with no feed**) | P0 (D2) | Attribution; the sentence that sells the next partner |
+| **P5** | Route queue (manual SARA Plus) then partner connector | P4, real feed | First dollar from the channel |
+| **P5b** | Partner reconciliation (signed webhook, else nightly import) | P5 | Acceptance / clawback / payout — the numbers for partner #2 |
 | **P6** | Bundle-size work: split the report/PDF path (1,139 kB → target <400 kB entry) | — | Paid traffic economics |
 | **P7** | Dispute-dossier product (Support integration) | P3 (consent model) | **Revenue with no partner at all** |
 | **P8** | ISP scorecard / white-label embed for MSPs | P2 | Second partner-independent line |
@@ -320,34 +345,58 @@ becomes an obvious investment rather than a guess.
 
 ---
 
-## 9. Decisions I need from you
+## 9. Positioning rules (non-negotiable, enforced in code)
 
-1. **D2** — do we deploy the `leads` contract into platform Core, or repoint
-   `AXIM_CORE_URL` at the vendored service? (I recommend deploying into Core: the ledger
-   belongs with the portfolio, not inside a satellite's repo.)
-2. **Coverage feed** — does the DSI application allow us to ask for a ZIP/address feed at
-   the same time, or does that come only after approval? (Ask the AE; it changes P2's shape.)
-3. **P0 namespace** — say the word and give me the namespace id, or run the one command and
-   I'll wire the config in a separate PR.
-4. **Legal** — is the consent language mine to draft for your review, or do you want your
-   counsel to supply it?
-5. **Commercial posture** — confirm *route-only first*. If you want dealer-of-record, say
-   so now, because it changes P5 into a staffing project and I'd want to argue against it.
+The app is a universal speed test. These follow from that and are now enforced:
+
+1. **No audience question on the page.** Nobody is asked whether they are a business. The
+   SLA/contract card is an opt-in panel the reader chooses to open, not a gate.
+2. **Capability language, not procurement language.** Readiness grades are `Excellent / Good /
+   Limited` and rows are "Calls & voice", "Video & streaming", "Large uploads", "Devices &
+   people online at once" — comprehensible to a household, still useful to an IT lead.
+3. **Every lead is routed the same way.** `AUDIENCES.COMMERCIAL` adds 10 points of urgency and
+   changes nothing else. A household on the same cable plant is routed identically.
+4. **The instrument stays neutral.** No partner brand on the test surface, no AXiM brand on the
+   consumer surface, one card after the reading, silent when there is nothing true to say.
+5. **SEO and metadata describe the universal product.** Title, description, keywords, OG tags,
+   manifest and JSON-LD no longer say "enterprise". This is also a demand-generation asset: the
+   long-tail queries are "why is my internet slow", not "enterprise speed test".
+
+## 10. Decisions status (updated 2026-11-05)
+
+| # | Decision | Status |
+| --- | --- | --- |
+| 1 | Ingest into Core first, connectors forward later | ✅ **Settled** — architecture in `docs/lead-pipeline.md` |
+| 2 | Position against commercial *and* residential / neutral universal posture | ✅ **Settled** — rules in §9, enforced in code |
+| 3 | Coverage feed | ⏳ **You will supply ZIPs later.** Functionality built, dormant. Runbook: `docs/coverage-feed.md` |
+| 4 | Consent language | ✅ **Drafted** for counsel — `docs/consent-language.md`, version `sr-consent-2026-11-v1` |
+| 5 | Namespace naming | ✅ **Decided** — `speedreport-prospect-store`, `speedreport-serviceability` |
+| 6 | D2 — where `/api/v1/leads/telemetry` actually lands | ⏳ Open. Core is now the system of record, so this must be resolved in Core, not in the satellite |
+| 7 | Route-only first (vs dealer-of-record) | ⏳ Open — my recommendation stands: route-only until acceptance data exists |
 
 ---
 
-## 10. Appendix — files in this change
+## 11. Appendix — files in this change
 
 | File | Purpose |
 | --- | --- |
 | `src/utils/providerCatalog.js` | Transport classification from name + measurement; seed footprints; the coverage lookup with its fail-closed default. |
-| `src/utils/leadEngine.js` | Scoring with reasons, plan parsing, contact quality, single-offer selection, the `payable` predicate, PII-free telemetry projection. |
+| `src/utils/leadEngine.js` | Scoring with reasons, plan parsing, contact quality, single-offer selection, the `payable` predicate, PII-free telemetry projection. `AUDIENCES.UNIVERSAL` default; commercial is a weight only. |
+| `src/utils/readiness.js` | Audience-neutral grade scale (`Excellent / Good / Limited`), named thresholds, loaded-latency gating. |
+| `src/content/consent.js` | Single source of truth for consent copy, purpose and version; `isConsentCurrent()` and the stored record shape. |
 | `speedreport-worker/src/serviceability.ts` | `GET /api/serviceability` with ZIP validation, program allowlist, KV read, fail-closed resolution. |
 | `speedreport-worker/src/index.ts` | Route registration; `serviceability` added to `/health` dependency reporting. |
+| `src/App.jsx`, `src/components/{Header,BusinessAuditCard,FiberLeadCard,ISPDetailsCard,ReportCard,SpeedGauge}.jsx` | Positioning rewrite: enterprise-only language removed, capability-first language in its place. |
+| `index.html`, `public/manifest.webmanifest` | Title, description, keywords, OG/Twitter cards, JSON-LD and manifest copy retargeted at the universal product. |
+| `docs/consent-language.md` | Counsel-ready consent draft: checkbox, privacy notice, withdrawal, disclosure, implementation contract, and the eight questions I need answered. |
+| `docs/lead-pipeline.md` | Ingest-first architecture: stage contracts, enrichment steps, schema migration, state machine, connector interface, anti-goals. |
+| `docs/coverage-feed.md` | Dormancy definition, namespace naming, binding runbook, feed formats the loader accepts. |
 | `tests/providerCatalog.test.js` | 13 tests: classification priority, measurement fallback, coverage fail-closed. |
-| `tests/leadEngine.test.js` | 24 tests: scoring, plan parsing, quality tiers, offer precedence, payable gating, telemetry PII exclusion. |
+| `tests/leadEngine.test.js` | 25 tests: scoring, plan parsing, quality tiers, offer precedence, payable gating, audience neutrality, telemetry PII exclusion. |
 | `tests/serviceability.test.ts` | 15 tests: KV feed, malformed entries, KV failure, HTTP contract, allowlist-before-read, ZIP never logged, health binding. |
+| `tests/consent.test.js` | 11 tests: single purpose, version shape, no "must consent" phrasing, decline parity, stale-version rejection, hashed-IP only. |
+| `tests/readiness.test.js` | 6 tests, updated for the neutral grade scale. |
 | `tests/workerHttp.test.ts` | Fixture updated for the new binding; health asserts the coverage-feed state. |
 
-**Verified before hand-off:** `vitest run` → 140 passed / 16 files · `eslint --quiet` clean ·
+**Verified before hand-off:** `vitest run` → see PR checks · `eslint --quiet` clean ·
 `speedreport-worker tsc --noEmit` clean · `vite build` succeeds.

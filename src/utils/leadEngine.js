@@ -36,9 +36,19 @@ export const DEAL_TYPES = Object.freeze({
   RESOLVE_COVERAGE: 'resolve_coverage',
 });
 
+/**
+ * Audience is inferred, never asked. SpeedReport is a universal speed test: the
+ * page must not ask a home user whether they are "a business", and the lead
+ * engine must not gate a legitimate household lead behind a commercial tier.
+ *
+ * `COMMERCIAL` is a *scoring hint*, not a segment: it raises the urgency of an
+ * upgrade because an SLA-bearing contract, remote staff and support expectations
+ * make a degraded link costlier. The default is `UNIVERSAL`, and both audiences
+ * route through exactly the same coverage and payable gates.
+ */
 export const AUDIENCES = Object.freeze({
-  RESIDENTIAL: 'residential',
-  BUSINESS: 'business',
+  UNIVERSAL: 'universal',
+  COMMERCIAL: 'commercial',
 });
 
 /**
@@ -68,7 +78,7 @@ const SCORE_WEIGHTS = Object.freeze({
   badBufferbloat: 20,
   slowLatency: 15,
   underperformingPlan: 25,
-  businessAudience: 10,
+  commercialAudience: 10,
   fiberGap: 10,
 });
 
@@ -77,7 +87,7 @@ const SCORE_WEIGHTS = Object.freeze({
  * each contributing reason so the card copy and the Core ledger can justify the
  * number rather than assert it.
  */
-export function scoreOpportunity({ metrics = {}, meta = {}, audience = AUDIENCES.RESIDENTIAL, subscribedPlan } = {}) {
+export function scoreOpportunity({ metrics = {}, meta = {}, audience = AUDIENCES.UNIVERSAL, subscribedPlan } = {}) {
   const measured = {
     downloadMbps: Number(metrics.download) || 0,
     uploadMbps: Number(metrics.upload) || 0,
@@ -132,9 +142,12 @@ export function scoreOpportunity({ metrics = {}, meta = {}, audience = AUDIENCES
     }
   }
 
-  if (audience === AUDIENCES.BUSINESS) {
-    score += SCORE_WEIGHTS.businessAudience;
-    reasons.push('business-grade reliability expectations');
+  // A commercial hint makes the same degradation costlier. It weights the score
+  // and nothing else: a household on the same cable plant scores lower and is
+  // routed through identical gates.
+  if (audience === AUDIENCES.COMMERCIAL) {
+    score += SCORE_WEIGHTS.commercialAudience;
+    reasons.push('business-critical usage implicated');
   }
 
   const fiberButSlow =
@@ -258,7 +271,7 @@ export function selectOffer({ opportunity, coverage }) {
 export function buildLeadIntent({
   report,
   contact = {},
-  audience = AUDIENCES.RESIDENTIAL,
+  audience = AUDIENCES.UNIVERSAL,
   subscribedPlan,
   serviceability = null,
 } = {}) {

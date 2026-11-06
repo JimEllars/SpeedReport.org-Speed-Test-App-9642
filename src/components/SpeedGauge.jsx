@@ -18,7 +18,7 @@ function getGaugeMaxScale(mbps) {
 // Single source of truth for the centre readout: the digits and the unit must be
 // scaled by the same factor. Formatting them independently rendered a 1.23 Gbps
 // link as "1234.5 Gbps" - a 1000x overstatement on exactly the multi-gigabit
-// circuits commercial buyers are running.
+// links that are now common on both household and business circuits.
 function formatGaugeReading(mbps) {
   const value = Number.isFinite(mbps) && mbps > 0 ? mbps : 0;
   if (value >= 1000) {

@@ -104,19 +104,20 @@ useEffect(() => {
       <main>
         <section className="intro">
           <div className="hidden sm:block">
-            <span className="eyebrow">Commercial-grade edge testing</span>
+            <span className="eyebrow">Fast, private, edge-measured</span>
             <h1>
-              Know if your connection
+              Know what your connection
               <br />
-              <em>means business.</em>
+              <em>can actually do.</em>
             </h1>
           </div>
           <p className="hidden sm:block">
-            Measure bandwidth, latency, jitter, packet loss, and loaded performance
-            —then translate the numbers into operational readiness.
+            Measure download, upload, latency, jitter, packet loss and
+            performance under load — then see what those numbers mean in plain
+            language, with a report you can keep or send.
           </p>
           <div className="sm:hidden text-center mb-2 col-span-full">
-            <span className="eyebrow mx-auto inline-block">Commercial-Grade Edge Diagnostics</span>
+            <span className="eyebrow mx-auto inline-block">Fast, private, edge-measured</span>
           </div>
         </section>
 

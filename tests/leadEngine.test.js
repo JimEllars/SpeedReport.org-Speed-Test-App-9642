@@ -71,7 +71,7 @@ describe('scoreOpportunity', () => {
     const overloaded = scoreOpportunity({
       metrics: { download: 5, upload: 0.5, ping: 300, bufferbloat: 'F' },
       meta: { isp: 'HughesNet' },
-      audience: AUDIENCES.BUSINESS,
+      audience: AUDIENCES.COMMERCIAL,
       subscribedPlan: '100/10',
     });
     expect(overloaded.score).toBeLessThanOrEqual(100);
@@ -97,6 +97,33 @@ describe('scoreOpportunity', () => {
     });
     expect(result.onFiber).toBe(true);
     expect(result.reasons.join(' ')).toContain('fiber link delivering only 150 Mbps');
+  });
+});
+
+describe('audience posture', () => {
+  it('is neutral by default: no audience is ever required to build an intent', () => {
+    const intent = buildLeadIntent({ report: cableReport, contact: {} });
+    expect(intent.audience).toBe(AUDIENCES.UNIVERSAL);
+    expect(intent.payable).toBe(false);
+  });
+
+  it('treats a commercial hint as a weight, not a gate', () => {
+    const universal = buildLeadIntent({
+      report: cableReport,
+      contact: { email: 'a@b.test', name: 'Ops', postalCode: '75001', consent: true },
+      serviceability: coveredFeed,
+    });
+    const commercial = buildLeadIntent({
+      report: cableReport,
+      contact: { email: 'a@b.test', name: 'Ops', postalCode: '75001', consent: true },
+      serviceability: coveredFeed,
+      audience: AUDIENCES.COMMERCIAL,
+    });
+
+    expect(commercial.opportunity.score).toBeGreaterThan(universal.opportunity.score);
+    // Identical routing outcome: the hint never unlocks or blocks a route.
+    expect(commercial.offer.type).toBe(universal.offer.type);
+    expect(commercial.payable).toBe(universal.payable);
   });
 });
 

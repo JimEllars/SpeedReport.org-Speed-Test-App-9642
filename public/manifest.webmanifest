@@ -1,7 +1,7 @@
 {
   "name": "SpeedReport.org",
   "short_name": "SpeedReport",
-  "description": "Enterprise Internet Connection & Network Diagnostics",
+  "description": "Fast, reliable, privacy-first internet speed test and diagnostics",
   "start_url": "/",
   "display": "standalone",
   "orientation": "any",
