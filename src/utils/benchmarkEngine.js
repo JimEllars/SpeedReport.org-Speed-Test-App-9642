@@ -181,11 +181,54 @@ export class ThroughputCalculator {
       this.allBytes += bytes;
     }
 
-    // slide window: remove chunks older than windowSize
+    this.pruneWindow(now);
+  }
+
+  /**
+   * Drop chunks that have slid out of the rolling window. Extracted so a batch
+   * credit keeps `totalBytesInWindow` consistent with `chunks`.
+   */
+  pruneWindow(now = performance.now()) {
     while (this.chunks.length > 0 && now - this.chunks[0].time > this.windowSize) {
       this.totalBytesInWindow -= this.chunks[0].bytes;
       this.chunks.shift();
     }
+  }
+
+  /**
+   * Credit `bytes` that transferred over the preceding `elapsedMs`, distributed
+   * across that interval in ~100ms slices.
+   *
+   * A browser that emits no upload progress events hands us one batch per
+   * request, and crediting it at a single instant is wrong twice over: the
+   * window divides a whole payload by the 10ms floor (524288 bytes over 10ms
+   * reads as 419 Mbps on a 60 Mbps link) and the 90th-percentile history then
+   * adopts that spike as the final result. Slicing keeps both the live window
+   * and the history at the rate actually observed.
+   */
+  addBatch(bytes, elapsedMs) {
+    if (!(bytes > 0)) return;
+
+    const now = performance.now();
+    const span = Math.max(elapsedMs, 1);
+    const slices = Math.max(1, Math.min(Math.round(span / 100), 60));
+    const perSlice = bytes / slices;
+    const step = span / slices;
+    // Slices are backdated, so they must not land behind a chunk already
+    // recorded for this request; the window slide assumes ascending times.
+    const floor = this.chunks.length ? this.chunks[this.chunks.length - 1].time : -Infinity;
+
+    for (let index = 0; index < slices; index += 1) {
+      const at = Math.max(now - span + step * (index + 1), floor);
+      this.chunks.push({ bytes: perSlice, time: at });
+      this.totalBytesInWindow += perSlice;
+      if (at - this.started >= this.warmupTime) {
+        this.allBytes += perSlice;
+      }
+    }
+
+    this.lastBytesTime = now;
+    this.pruneWindow(now);
   }
 
   getLiveSpeedMbps() {
@@ -520,10 +563,16 @@ function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
       // and inflated the throughput reading.
       const status = xhr.status;
       if (status >= 200 && status < 300) {
-        // Credits whatever `progress` did not already account for, which is the
+        // Credit whatever `progress` did not already account for, which is the
         // whole payload in Firefox and nothing in a browser that reported every
-        // byte. Reaching a 2xx means the edge received all of it.
-        creditUpTo(byteLength);
+        // byte. Reaching a 2xx means the edge received all of it, and spreading
+        // the credit over the request's real duration keeps the reading at the
+        // observed rate instead of the window's 10ms floor.
+        const remaining = byteLength - creditedBytes;
+        if (remaining > 0) {
+          creditedBytes = byteLength;
+          calculator.addBatch(remaining, performance.now() - started);
+        }
         resolve({ bytes: byteLength, ms: performance.now() - started });
         return;
       }

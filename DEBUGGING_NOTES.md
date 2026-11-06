@@ -6,6 +6,55 @@ notes alone.
 
 ---
 
+## 2026-11-06 — Follow-up (05:55 EST)
+
+### 5. The upload fix shipped `419.4 Mbps` — crediting a batch at one instant
+
+**Symptom:** after `2ac90a8` deployed, a live production test in Firefox 158
+reported `Download 64.3 Mbps` · **`Upload 419.4 Mbps`** · `Assessment complete`.
+Upload was no longer `0.0`, but the number was worse than useless on a circuit
+that uploads at a fraction of its download.
+
+**Mechanics:** the fix credited the whole payload on the 2xx response, which is
+correct *as a byte count* and wrong *as a timestamp*. The rolling window computes
+
+```js
+const oldestTime = this.chunks[0].time;
+let windowDuration = now - oldestTime;   // 0 for a single fresh chunk
+if (windowDuration < 10) windowDuration = 10;   // floor
+const mbps = (this.totalBytesInWindow * 8) / (windowDuration / 1000) / 1e6;
+```
+
+With one 512 KiB chunk in the window, `windowDuration` hits the 10ms floor:
+`524288 × 8 / 0.01 / 1e6 = 419.4 Mbps` — the exact figure on screen. Worse, the
+sample is pushed into `speedHistory`, and `getFinalSpeedMbps()` returns the 90th
+percentile of that history, so the artifact became the phase result.
+
+**Why the tests did not catch it:** every unit test asserted `bandwidth > 0` and
+`stalled === false`. A magnitude-blind assertion passes on a value that is wrong
+by two orders of magnitude. The verification lesson, not the test, is the point:
+**check the deployed build against a known link, not just the diff.**
+
+**Resolution:** `addBatch(bytes, elapsedMs)` distributes a bulk credit over the
+request's real duration in ~100ms slices, so the window and the percentile
+history both see throughput:
+
+```js
+const slices = Math.max(1, Math.min(Math.round(span / 100), 60));
+const at = Math.max(now - span + step * (index + 1), floor);
+this.chunks.push({ bytes: perSlice, time: at });
+```
+
+`pruneWindow()` was extracted from `addBytes` so a batch keeps
+`totalBytesInWindow` equal to the sum of `chunks`.
+
+**Caught by:** `tests/throughputCalculator.test.js` asserts a 512 KiB / 1900ms
+batch reads `1.5–3.5 Mbps` (the artifact read 419) and that repeated batches hold
+the observed rate; `tests/benchmarkUpload.test.js` bounds a single-request link
+to `2–20 Mbps`.
+
+---
+
 ## 2026-11-06 — Daily review (04:35 EST)
 
 ### 1. Upload measured `0.0 Mbps` in Firefox — no `progress` events, so no bytes

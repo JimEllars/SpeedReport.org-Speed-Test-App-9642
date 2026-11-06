@@ -58,6 +58,43 @@ describe('ThroughputCalculator', () => {
     now = 1000 + STALL_THRESHOLD_MS; // 7000ms since last byte
     expect(calc.checkStall()).toBe(true);
   });
+
+  it('spreads a batch credit over the request duration instead of one instant', () => {
+    const calc = new ThroughputCalculator();
+    // 512 KiB over 1900ms is ~2.2 Mbps. Credited as a single chunk it read as
+    // 419 Mbps - the payload divided by the 10ms window floor.
+    now = 1900;
+    calc.addBatch(524288, 1900);
+
+    const live = calc.getLiveSpeedMbps();
+    expect(live).toBeGreaterThan(1.5);
+    expect(live).toBeLessThan(3.5);
+  });
+
+  it('keeps repeated batch credits at the observed rate', () => {
+    const calc = new ThroughputCalculator();
+    // 1 MiB per 2s is ~4.2 Mbps, five times over.
+    for (let index = 0; index < 5; index += 1) {
+      now = (index + 1) * 2000;
+      calc.addBatch(1024 * 1024, 2000);
+    }
+
+    const final = calc.getFinalSpeedMbps();
+    expect(final).toBeGreaterThan(2.5);
+    expect(final).toBeLessThan(7);
+  });
+
+  it('does not leave the window total out of step with the chunk list', () => {
+    const calc = new ThroughputCalculator();
+    now = 0;
+    calc.addBytes(1000);
+    now = 5000;
+    calc.addBatch(2048, 1000);
+    now = 7000;
+
+    const summed = calc.chunks.reduce((total, chunk) => total + chunk.bytes, 0);
+    expect(calc.totalBytesInWindow).toBeCloseTo(summed, 6);
+  });
 });
 
 describe('phase budgets', () => {

@@ -53,26 +53,34 @@ class FakeXHR extends FakeEventTarget {
 
   send(payload) {
     this.sent = payload;
+    const total = payload.byteLength;
+
+    const finish = () => {
+      if (this.aborted) return;
+      this.upload.dispatch('load', { loaded: total, total });
+      this.upload.dispatch('loadend', { loaded: total, total });
+      this.status = FakeXHR.status;
+      this.dispatch('load', {});
+    };
+
+    // loadstart is immediate in both engines.
     setTimeout(() => {
       if (this.aborted) return;
-      const total = payload.byteLength;
       this.upload.dispatch('loadstart', { loaded: 0, total });
 
       if (FakeXHR.plan === 'chrome') {
-        // Chrome reports incremental upload progress.
-        this.upload.dispatch('progress', { loaded: Math.floor(total / 4), total });
-        this.upload.dispatch('progress', { loaded: Math.floor(total / 2), total });
-        this.upload.dispatch('progress', { loaded: total, total });
+        // Chrome reports incremental upload progress, spread across the request
+        // rather than in one burst.
+        [0.34, 0.67, 1].forEach((fraction) => {
+          setTimeout(() => {
+            if (this.aborted) return;
+            this.upload.dispatch('progress', { loaded: Math.floor(total * fraction), total });
+          }, Math.round(FakeXHR.latencyMs * fraction) - 1);
+        });
       }
+    }, 0);
 
-      // Both engines fire load/loadend on the upload object; only Firefox omits
-      // the progress events above.
-      this.upload.dispatch('load', { loaded: total, total });
-      this.upload.dispatch('loadend', { loaded: total, total });
-
-      this.status = FakeXHR.status;
-      this.dispatch('load', {});
-    }, FakeXHR.latencyMs);
+    setTimeout(finish, FakeXHR.latencyMs);
   }
 
   abort() {
@@ -146,6 +154,17 @@ describe('measureUpload byte accounting', () => {
 
     expect(result.bandwidth).toBe(0);
     expect(result.stalled).toBe(false);
+  });
+
+  it('reports the observed rate for a single-request link, not the window floor', async () => {
+    // 512 KiB every 1900ms per stream, four streams => ~8.8 Mbps aggregate.
+    // Crediting each payload at one instant instead read as 419 Mbps, because
+    // the rolling window divides by its 10ms floor when it holds one chunk.
+    FakeXHR.latencyMs = 1900;
+    const result = await runPhase(6000);
+
+    expect(result.bandwidth).toBeGreaterThan(2);
+    expect(result.bandwidth).toBeLessThan(20);
   });
 });
 
