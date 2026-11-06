@@ -7,6 +7,203 @@ actually run against the commit it claims to cover.
 
 ---
 
+## Run: 2026-11-06 — 04:35 EST daily review
+
+- **Repository:** `JimEllars/SpeedReport.org-Speed-Test-App-9642`
+- **Base commit:** `13f6d8d` (`docs(edge): correct the screening claims with post-deploy probe evidence (#70)`)
+- **Branch:** `fix/speedreport-2026-11-06-upload-progress-events`
+- **Node / npm:** `v22.23.4` / `10.9.9`
+- **Upstream sync:** `git fetch origin main` then `git fetch --all --prune` ran
+  first; the prune surfaced one new remote branch (`feat/lead-engine-phase1`, PR
+  #71). `git log origin/main --since="24 hours ago" --oneline` returned three
+  commits — `13f6d8d` (#70), `d7aea2b` (#69), `bf4ae26` (#68) — all agents' own
+  merged work from the 2026-11-05 window. **No human commits landed in the
+  preceding 24h**, so there were no adjusted benchmark thresholds or styling to
+  absorb and `HEAD` already equalled `origin/main`.
+- **Open PRs at start:** 6 — #71 (lead engine Phase 1, green, `MERGEABLE`, opened
+  09:26Z today), #67, #64, #63, #51, #49 (Dependabot). `gh pr checks 71`:
+  `Validate application pass`, `Validate Worker (dry-run) pass`, `GitGuardian
+  Security Checks pass`, `Deploy production Worker skipping`. No PR had a failing
+  check, so there was no inherited red build.
+- **Scratch artifacts:** none. `git status --porcelain` listed only the files
+  below; no `sprint-*.patch` or test dumps.
+
+### Starting state: baseline was green
+
+`npm run lint` clean and the full unit suite green (**13 files / 88 tests**) on
+`13f6d8d` before any edit, so forward work was not frozen. `npm run build`
+(644 modules, 309.82 kB gzip), Worker `tsc --noEmit`, Worker `npm test`
+(4 files / 38 tests) and `wrangler deploy --dry-run` were also green.
+
+### Step-4 roadmap audit: all five items already shipped
+
+Re-verified against the source rather than the changelog: `windowSize = 1000`
+(`benchmarkEngine.js:200`), the 512 KiB → 4 MiB ladder (`UPLOAD_CHUNK_LADDER_BYTES`,
+`:434`), `STALL_THRESHOLD_MS = 6000` (`:151`), `xhr.status >= 200 && < 300` on
+`load` (`:522`), `PHASE_INDICATORS` emerald/cyan/purple accents and the four
+centre messages in `SpeedGauge.jsx:39–53`, HMAC-SHA256 + `X-Axim-Timestamp` and
+the `dlq:lead:{testId}` / 86400s buffer in `telemetry.ts`, and the `403` CGI /
+traversal screen in `index.ts:63–89`. Nothing needed re-implementing.
+
+What the review found instead is that the roadmap item *"progressive upload
+chunks"* was implemented and still reported `0.0 Mbps` in production, because
+the engine read only one of the several signals a browser uses to report
+uploaded bytes. That is the defect this run fixes.
+
+### Production blocker reproduced, then fixed and re-verified
+
+| Step | Evidence |
+| --- | --- |
+| `curl -X POST https://speedreport.org/api/upload` — 512 KiB, 1 MiB, 1 MiB+1 | `200` with `{"receivedBytes":1048576,"durationMs":8}` — endpoint healthy, so the failure had to be client-side |
+| Browser, production (Firefox 158), before fix | `Assessment partially complete` · `Download 157.3 Mbps` · `Upload 0.0 Mbps` · banner *"Network stall detected during upload"* |
+| Single 512 KiB XHR, every upload event logged | `loadstart 7ms` → `load 2414ms loaded=524288` → `loadend 2414ms` → `xhr.loadend 2495ms status=200`. **No `progress` event at all** |
+| Worker log, local `wrangler dev`, after fix | `POST /api/upload 200 OK` ×7 (485/727/964/1038/639/240/404 ms) |
+| Browser, local Worker + production build, after fix | `Assessment complete` · `Download 29.9 Mbps` · **`Upload 2.8 Mbps`** · no error banner |
+
+### Files modified
+
+| File | Lines (before → after) | Changed line ranges |
+| --- | --- | --- |
+| `src/utils/benchmarkEngine.js` | 620 → 683 | 228–237 (`ThroughputCalculator.markActivity()`), 435–440 (`{bytes, ms}` contract + `byteLength` captured before `send`), 449–453 / 535–538 (upload event listeners added), 474–514 (`creditUpTo` high-water mark, `onUploadStart`, `onBodySent`), 522–527 (2xx credits the remainder and resolves with timing), 599–620 (ladder climbs only when the next rung projects inside `STALL_THRESHOLD_MS / 2`) |
+| `public/sw.js` | 68 → 81 | 6–9 (`/manifest.json` → `/manifest.webmanifest`), 20–22 (`Promise.allSettled` install), 44–58 (network-first navigations with cached fallback) |
+| `tests/benchmarkUpload.test.js` | new → 198 | whole file (6 tests) |
+| `CHANGELOG.md`, `AGENTS_VERIFICATION.md`, `DEBUGGING_NOTES.md`, `Continued Development Plan.md` | — | this run's entries |
+
+### Files deleted
+
+None.
+
+### Defects fixed
+
+1. **Upload credited bytes only from `XMLHttpRequestUpload` `progress`.** Firefox
+   does not emit `progress` for a buffered body, so no bytes were credited, the
+   live readout stayed `0.0`, and the 6s stall detector aborted the phase. Bytes
+   are now credited on the 2xx response, guarded by a per-request high-water mark
+   so `progress` and completion credit cannot double count.
+2. **Crediting the payload on the client-side `upload.load` would have restored
+   the 2026-11-02 inflation bug.** That event fires before the status is known.
+   Body-sent now only calls `markActivity()`; the 404 test fails if bytes are
+   credited there (`expected 1677.7 to be +0`).
+3. **The ladder climbed without regard to measured speed.** A rung is taken only
+   when `elapsed × nextSize / bytes ≤ STALL_THRESHOLD_MS / 2`.
+4. **A slow-but-alive upload could be cancelled with an empty byte counter.**
+   Request start and body-sent now mark activity without counting bytes.
+5. **Service worker precached a non-existent manifest** and served navigations
+   cache-first, which pinned a stale shell and bundle.
+
+### Verification (verbatim)
+
+`npm run lint` — clean:
+
+```
+> speedreport-org@1.0.0 lint
+> eslint .
+```
+
+`npm run build`:
+
+```
+vite v6.4.4 building for production...
+transforming...
+✓ 644 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/.assetsignore                0.02 kB
+dist/wrangler.json                1.08 kB │ gzip:   0.56 kB
+dist/index.html                   3.26 kB │ gzip:   1.10 kB
+dist/assets/index-DvneVEv9.css   26.95 kB │ gzip:   7.13 kB
+dist/assets/index-BfXmtr_b.js   896.33 kB │ gzip: 309.82 kB
+✓ built in 2m 21s
+```
+
+`npx vitest run tests/benchmarkUpload.test.js` (new file):
+
+```
+ ✓ measureUpload byte accounting > credits bytes when the browser emits only loadstart/load/loadend (Firefox) 484ms
+ ✓ measureUpload byte accounting > credits the same bytes once when progress and completion events both fire (Chrome) 798ms
+ ✓ measureUpload byte accounting > keeps a non-2xx rejection out of the throughput reading 84ms
+ ✓ measureUpload chunk ladder > starts every stream at 512 KiB 81ms
+ ✓ measureUpload chunk ladder > climbs the ladder once the measured rung fits inside the stall budget 391ms
+ ✓ measureUpload chunk ladder > holds the rung when the next one could not finish before the stall window 3ms
+ Test Files  1 passed (1)
+      Tests  6 passed (6)
+```
+
+`npx vitest run` — full suite, one process, no isolation (`--no-isolate`, host at
+load average 12.5 on 2 vCPU):
+
+```
+ Test Files  2 failed | 12 passed (14)
+      Tests  7 failed | 87 passed (94)
+```
+
+The 7 failures are shared-module contamination from `--no-isolate`, not code
+defects: `tests/telemetryIngress.test.ts` stubs the global `fetch` and the
+`axim-core` / `useSpeedTestStall` files then inherit it. Both were re-run in
+isolation and pass:
+
+```
+tests/axim-core.test.js + tests/useSpeedTestStall.test.js (isolated)
+ ✓ accepts a valid signature and upserts 406ms
+ ✓ rejects bad or missing signatures with 401 555ms
+ ✓ rejects invalid payloads after authentication 1041ms
+ ✓ returns 500 on storage failure 400ms
+
+ tests/useSpeedTestStall.test.js (isolated)
+ ✓ surfaces a stalled download as COMPLETED_PARTIAL with stall copy 804ms
+ ✓ surfaces a stalled upload as COMPLETED_PARTIAL with stall copy 75ms
+ ✓ reports COMPLETE when neither phase stalled and both produced bandwidth 79ms
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+```
+
+Baseline before any edit, same host, isolated: **13 files / 88 tests pass**. With
+the new file (6 tests, verified above) that is **14 files / 94 tests**. CI runs
+the canonical isolated suite on this PR and is the authoritative gate; the local
+batched runs above are recorded as batching, not as one green process.
+
+Worker gates:
+
+```
+$ cd speedreport-worker && npx tsc --noEmit
+(exit 0, no output)
+
+$ npx wrangler deploy --dry-run
+✨ Read 10 files from the assets directory /workspace/review/speedreport/dist
+Total Upload: 32.33 KiB / gzip: 8.80 KiB
+env.TELEMETRY (speedreport_telemetry)                     Analytics Engine Dataset
+env.ASSETS                                                Assets
+env.REPORT_RECIPIENT_TO ("contact@speedreport.org")       Environment Variable
+env.REPORT_RECIPIENT_BCC ("jrellars@gmail.com")           Environment Variable
+--dry-run: exiting now.
+(exit 0)
+
+$ npm test            # 2 of 4 files started before the 60s pool timeout
+ Test Files  2 passed (2)
+      Tests  16 passed (16)
+
+$ npx vitest run --no-isolate tests/worker.test.ts tests/reporter.test.js
+ ✓ tests/worker.test.ts > Edge cyber defence > blocks PHP CGI dash argument with 403 1ms
+ … 18 worker.test.ts + 4 reporter.test.js assertions
+ Test Files  2 passed (2)
+      Tests  22 passed (22)
+```
+
+Worker suite total: **4 files / 38 tests**, verified in two batches. Neither the
+worker source nor its tests were touched by this diff.
+
+### Environment limit, recorded not hidden
+
+`[vitest-pool]: Failed to start forks worker … Timeout waiting for worker to
+respond` appeared intermittently for files that pass standalone. `START_TIMEOUT`
+is a hardcoded 60 000 ms constant in vitest 5.0.3
+(`node_modules/vitest/dist/chunks/index.DpLw24bj.js:10760`) and jsdom
+environment creation on this host takes ~29 s per file at rest, more under load
+from other sessions. No `poolOptions.startTimeout` exists to raise it — vitest 4
+removed `poolOptions`. Nothing in the repository was changed for this.
+
+---
+
 ## Run: 2026-11-05 — 04:35 EST daily review
 
 - **Repository:** `JimEllars/SpeedReport.org-Speed-Test-App-9642`

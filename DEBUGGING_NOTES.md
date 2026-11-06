@@ -6,6 +6,131 @@ notes alone.
 
 ---
 
+## 2026-11-06 — Daily review (04:35 EST)
+
+### 1. Upload measured `0.0 Mbps` in Firefox — no `progress` events, so no bytes
+
+**Symptom:** every upload phase finished at `0.0 Mbps` while download measured
+fine (1264.9 Mbps on the same session), the gauge ended on *Assessment partially
+complete*, and the banner read *"Network stall detected during upload; measured
+throughput may understate capacity."* `curl -X POST https://speedreport.org/api/upload`
+returned `200` at 512 KiB, 1 MiB and 8 MiB with a correct
+`{"receivedBytes":…,"durationMs":…}` body, so the endpoint was healthy and the
+failure was client-side.
+
+**Reproduction (before the fix), Firefox 158 against production:**
+
+1. Open `https://speedreport.org/`, press *Start speed test*.
+2. Result: `Download 157.3 Mbps`, `Upload 0.0 Mbps`, `Latency 6201 ms`,
+   `Assessment partially complete`, stall banner as above.
+
+**Decisive instrumentation.** A single 512 KiB `XMLHttpRequest` POST with
+listeners on every upload-object event returned:
+
+```
+upload.loadstart     7 ms   loaded=0
+upload.load       2414 ms   loaded=524288
+upload.loadend    2414 ms   loaded=524288
+xhr.loadend       2495 ms   status=200
+```
+
+**No `progress` event at all.** Firefox only emits `XMLHttpRequestUpload`
+`progress` for a body it streams incrementally; a buffered `ArrayBuffer` body
+goes straight from `loadstart` to `load` carrying the full byte count. The engine
+credited bytes *only* from `progress`:
+
+```js
+const onProgress = (event) => {
+  const loadedBytes = event.loaded - lastLoaded;
+  calculator.addBytes(loadedBytes);   // never ran in Firefox
+  lastLoaded = event.loaded;
+};
+```
+
+**Why it looked like a stall and not an error:**
+
+- `addBytes()` is the only writer of `ThroughputCalculator.lastBytesTime`, so
+  the stall clock never reset and `checkStall()` returned true 6 s into the
+  phase, every phase.
+- `totalBytesInWindow` stayed `0`, so `getLiveSpeedMbps()` returned `0` and the
+  phase score was `0.0 Mbps`.
+- The stall abort then surfaced as the stall banner, because `stalled` is set
+  before the phase returns. A measurement bug therefore presented as a *network*
+  fault, and the real cause — a browser event-contract difference — was invisible.
+
+**Resolution:** credit the payload when the edge proves it accepted it — on the
+response `load` with a 2xx status — and keep a per-request high-water mark so
+`progress` and the completion credit cannot double count:
+
+```js
+let creditedBytes = 0;
+const creditUpTo = (loaded) => {
+  const delta = loaded - creditedBytes;
+  if (delta <= 0) return;
+  creditedBytes = loaded;
+  calculator.addBytes(delta);
+};
+// on response load, 2xx only:
+creditUpTo(byteLength);
+```
+
+The tempting fix — credit the full payload on the upload object's `load` event —
+is wrong, and the new 404 test catches it: `upload.load` fires *before* the
+response, so crediting there scores bytes the edge rejected and re-introduces the
+inflation bug fixed on 2026-11-02. Body-sent therefore only calls
+`calculator.markActivity()`; bytes wait for the 2xx.
+
+**Also fixed around it:**
+
+- `markActivity()` on request start and body-sent, so a slow but healthy upload
+  is not cancelled for having an empty byte counter while a payload is in flight.
+- The ladder now climbs only when `elapsed × nextSize / bytes ≤ STALL_THRESHOLD_MS / 2`.
+  Previously each stream advanced one rung per completed request no matter how
+  slow the link was, so a 768 kbps uplink reached the 4 MiB rung where a single
+  request exceeds the stall window by construction.
+- `payload.byteLength` is captured before `xhr.send()`, because an engine that
+  detaches the buffer would zero it and credit nothing — the same failure class.
+
+**Caught by:** `tests/benchmarkUpload.test.js` (6 tests) drives a fake
+`XMLHttpRequest` through each engine's real event sequence. A `progress`-only
+implementation fails the Firefox test with `expected 0 to be greater than 0`.
+
+**Lesson:** a browser gives you several overlapping signals for "bytes moved"
+and they are not interchangeable. Test the event sequence, not the happy path on
+the one engine the developer happens to use.
+
+### 2. The service worker precached a file that does not exist
+
+**Symptom:** none — that is the problem. `public/sw.js` precached
+`/manifest.json`; `index.html` references `/manifest.webmanifest` (verified:
+`/manifest.json` returns `200 text/html`). Because this origin answers unknown
+paths with the SPA shell, `cache.addAll` resolved successfully and stored
+`index.html` under a manifest key, so the mistake could not surface as an install
+failure.
+
+**Resolution:** precache the real path, add each asset independently
+(`Promise.allSettled`) so one 404 cannot abort the install, and serve navigations
+network-first so a deploy is picked up instead of a cached shell pinning the
+previous bundle.
+
+### 3. A vitest worker-start timeout is not a red test
+
+**Symptom:** the suite reported `13 passed / 88 tests` **and** `Errors 1`,
+exit code 1, on a file that passes standalone in every run.
+
+**Cause:** `[vitest-pool]: Failed to start forks worker … Timeout waiting for
+worker to respond`. `START_TIMEOUT` is a hardcoded 60 000 ms constant in vitest
+5.0.3 (`node_modules/vitest/dist/chunks/index.DpLw24bj.js:10760`), and jsdom
+environment creation on this 2-vCPU host takes ~29 s per file. It is
+infrastructure, not code — no `poolOptions.startTimeout` exists to raise it
+(vitest 4 removed `poolOptions`).
+
+**Resolution:** none in the codebase. Recorded as an environment limit; the
+verification entry states which files were proven in which run rather than
+claiming a single green process.
+
+---
+
 ## 2026-11-05 — Daily review (04:35 EST)
 
 ### 1. The gauge showed `0.0 Mbps` for the entire test — in the render path

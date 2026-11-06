@@ -1,6 +1,6 @@
 # SpeedReport.org — Continued Development Plan
 
-_Last reconciled: 2026-11-05 (daily 04:35 EST review)_
+_Last reconciled: 2026-11-06 (daily 04:35 EST review)_
 
 This document tracks the forward roadmap for the SpeedReport.org edge engine and
 the anonymous AXiM Core ingress feed. It is reconciled at the end of every daily
@@ -33,11 +33,31 @@ those.
 | Stream loops stop on `phaseSignal`, not just the caller | ✅ 2026-11-04 |
 | Gauge centre readout actually animates to the live value | ✅ 2026-11-05 |
 | Mbps/Gbps digits and unit scaled by the same factor | ✅ 2026-11-05 |
+| Upload bytes credited when the browser emits no `progress` events (Firefox) | ✅ 2026-11-06 |
+| Request-level byte credit made idempotent (progress + completion cannot double count) | ✅ 2026-11-06 |
+| Ladder climbs only when the next rung projects inside half the stall window | ✅ 2026-11-06 |
+| Upload in flight counts as activity, so a slow-but-alive link is not stalled | ✅ 2026-11-06 |
 
 **Why:** browser progress callbacks are throttled to 250–500ms. A 200ms rolling
 window emptied between callbacks on high-latency links, so the gauge snapped to
 `0.0 Mbps` mid-test even though the link was transferring fine. A 1000ms window
 spans several throttling ticks and keeps the readout continuous.
+
+**2026-11-06 — the same symptom, a third cause.** The 2026-11-02 window fix and
+the 2026-11-05 render fix both addressed `0.0 Mbps` readings. Production still
+reported `0.0` upload because the engine credited bytes only from
+`XMLHttpRequestUpload` `progress`, which Firefox never fires for a buffered body.
+The lesson generalises: any signal a browser *may* omit must have a corroborating
+path, and the fallback must be tested against the engine's real event sequence
+rather than the developer's own browser. `tests/benchmarkUpload.test.js` now
+encodes both sequences.
+
+Remaining known limit: a single request that cannot finish inside
+`STALL_THRESHOLD_MS` still ends the phase as stalled. The ladder guard keeps the
+chosen rung proportional to measured throughput, which covers slow links whose
+first 512 KiB rung itself fits; a link slower than ~700 kbps cannot be measured
+by this phase shape at all and would need a smaller first rung (a 256 KiB step is
+the obvious next lever, queued under *Next up*).
 
 ### 2. Lead delivery reliability (satellite → Core)
 
@@ -136,6 +156,16 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
 
 ## Next up (queued, not started)
 
+- **A 256 KiB first rung for very slow uplinks.** The ladder now refuses to climb
+  past what the measured transfer supports, but the first rung is still 512 KiB,
+  so a link slower than ~700 kbps cannot finish one request inside the 6s stall
+  window and is reported as stalled. One extra step costs a single round trip on
+  fast links. Cover it with a `FakeXHR.latencyMs` above the stall window in
+  `tests/benchmarkUpload.test.js`.
+- **Upload failure reason never reaches the UI.** A phase where every stream is
+  rejected (`HTTP 404`/`503`) returns `{ bandwidth: 0, stalled: false }` and the
+  copy says *"Test completed partially due to network instability"*. PR #71's
+  `failure.js` classification is the right carrier; not duplicated here.
 - **`isolate: false` for vitest.** jsdom environment creation is still ~72% of
   suite runtime (12 files, one environment each, ~15s startup apiece — 310s wall
   clock for 73 tests). Sharing workers would cut most of that, but only once the
@@ -149,14 +179,28 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
 - **Dependabot backlog.** Five open PRs (#67 follow-redirects, #64 undici+wrangler,
   #63 vite, #51 and #49 sharp). All checks green; waiting on maintainer triage
   because they cross the dependency graph of a pipeline that deploys on `main`.
-- **Local suite needs `pool: 'vmThreads'` or `isolate: false`.** 13 files now cost
-  ~310s and occasionally cannot start at all when the host is loaded — eight jsdom
-  forks workers died at startup during this run. CI is unaffected (37s for the
-  whole job). Worth fixing once the suite is bigger.
+- **Local suite needs worker reuse, but isolation first.** 14 files now cost
+  ~560s and occasionally cannot start at all when the host is loaded — `START_TIMEOUT`
+  is hardcoded at 60s in vitest 5.0.3 and jsdom environment creation takes ~29s per
+  file here. `--no-isolate` finishes the run but leaks global stubs: after
+  `tests/telemetryIngress.test.ts` stubs `fetch`, 7 tests in
+  `axim-core`/`useSpeedTestStall` fail until they run alone. Restore those globals
+  in `afterEach` before flipping the flag. CI is unaffected (~40s for the job).
 
 ---
 
 ## Done log
+
+- **2026-11-06** — Upload no longer reports `0.0 Mbps` in Firefox: bytes are
+  credited on the 2xx response instead of only from `XMLHttpRequestUpload`
+  `progress`, which Firefox never fires for a buffered body (per-request
+  high-water mark keeps progress + completion idempotent; body-sent marks
+  activity rather than bytes so a rejected upload cannot inflate the reading).
+  Upload ladder climbs only when the next rung projects inside half the stall
+  window. Service worker precaches the real `/manifest.webmanifest` and serves
+  navigations network-first. 6 new regression tests (14 files / 94 total).
+  Reproduced the blocker in the browser against production and re-verified the
+  fix in the browser against a local Worker running the production build.
 
 - **2026-11-05** — Gauge centre readout un-frozen (EMA `dt` computed before
   `lastTime` was overwritten; the number had never moved during a test), Gbps unit

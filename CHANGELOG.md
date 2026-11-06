@@ -5,6 +5,80 @@ first and timestamped with the review window that produced them.
 
 ---
 
+## [2026-11-06] — 04:35 EST daily review
+
+Upload measures a real number in Firefox again, the chunk ladder refuses to
+climb onto a rung the link cannot finish, and the service worker stops pinning a
+stale shell.
+
+### Fixed
+
+- **The upload phase reported `0.0 Mbps` for every Firefox visitor.** The engine
+  credited transfer only from `XMLHttpRequestUpload` `progress` events. Firefox
+  does not emit `progress` for a buffered body: a 512 KiB POST goes
+  `loadstart` → `load` (`loaded = 524288`) → `loadend` and nothing else, so no
+  bytes were ever credited, the live readout stayed at `0.0`, and the 6s stall
+  detector tore the phase down as if the link were dead. Reproduced in the
+  browser against production before the fix (`Assessment partially complete`,
+  `Upload 0.0 Mbps`, banner *"Network stall detected during upload"*) and again
+  against a local Worker after it (`Assessment complete`, `Upload 2.8 Mbps`, no
+  banner). Bytes are now credited on the 2xx response, which is the point the
+  edge proves it accepted them. `src/utils/benchmarkEngine.js`
+- **A rejected upload inflated the reading again, a second time.** Crediting on
+  the client-side "body fully sent" event would have restored the exact bug the
+  2xx check was added to prevent, so body-sent only marks transport activity; the
+  bytes are credited when the response arrives. `src/utils/benchmarkEngine.js`
+- **The upload ladder climbed blind.** Each stream advanced a rung per completed
+  request regardless of how long that request took, so a 768 kbps uplink walked
+  up to 4 MiB — a single request that outlasts `STALL_THRESHOLD_MS` — and a
+  healthy link was reported as stalled. A rung is now taken only when the
+  measured transfer says the next one projects inside half the stall window.
+  `src/utils/benchmarkEngine.js`
+- **A slow-but-alive upload could be cancelled by the stall detector before the
+  first byte count.** Request start and body-sent now mark transport activity
+  without counting bytes (`ThroughputCalculator.markActivity()`), so the stall
+  verdict reflects a genuinely silent transport rather than an empty counter.
+  `src/utils/benchmarkEngine.js`
+- **The service worker precached the wrong manifest.** `ASSETS_TO_CACHE` listed
+  `/manifest.json`, which does not exist — this origin answers it with the SPA
+  shell (`200 text/html`, verified against production), so `cache.addAll`
+  succeeded and stored `index.html` under a manifest key while the real
+  `/manifest.webmanifest` was never cached. One missing asset also aborted the
+  whole install via `addAll`; each asset is now added independently.
+  `public/sw.js`
+- **Navigations were cache-first.** `index.html` and the hashed bundle it
+  references were pinned for as long as the cache survived, so a browser that
+  had visited once kept booting a build that had already been replaced. Network
+  requests now win for `mode === 'navigate'`, with the cached shell as the
+  offline fallback. `public/sw.js`
+
+### Added
+
+- **`tests/benchmarkUpload.test.js` — 6 regression tests** driving a fake
+  `XMLHttpRequest` through the exact event sequences each engine emits:
+  Firefox's `loadstart`/`load`/`loadend` with no `progress`, Chrome's incremental
+  `progress` plus completion, a 404 rejection that must not reach the throughput
+  figure, and three ladder assertions (first rung 512 KiB for every stream,
+  climbs on a fast link, holds the rung when the next one cannot finish inside
+  half the stall window).
+
+### Verified
+
+`npm run lint` clean · **14 files / 94 tests pass** · `npm run build` 644 modules,
+309.82 kB gzip · Worker `tsc --noEmit` exit 0 · Worker `npm test` 4 files / 38
+tests pass · `wrangler deploy --dry-run` clean · browser pass in Firefox 158
+against a local Worker running the production build. Verbatim output in
+`AGENTS_VERIFICATION.md`.
+
+### Still blocked on an operator
+
+`PROSPECT_STORE` remains unbound in `wrangler.jsonc`, so the DLQ and the per-IP
+lead rate limiter are still no-ops in production and `/health` still reports
+`degraded`. Six green Dependabot PRs (#67, #64, #63, #51, #49) and PR #71 are
+waiting on maintainer triage.
+
+---
+
 ## [2026-11-05] — 04:35 EST daily review
 
 A live speed readout that actually moves, a gigabit unit fix, CORS on the error
