@@ -53,6 +53,43 @@ batch reads `1.5–3.5 Mbps` (the artifact read 419) and that repeated batches h
 the observed rate; `tests/benchmarkUpload.test.js` bounds a single-request link
 to `2–20 Mbps`.
 
+### 6. A high-latency link was called a stall — the 6s threshold is absolute
+
+**Symptom:** after `9660201` deployed, a live test reported
+`Download 1677.7 Mbps` · `Upload 0.0 Mbps` · `Latency 0.0 ms` · *"Network stall
+detected during upload"*.
+
+**Measurement (in-page, production):** four concurrent 512 KiB uploads looped for
+12s produced 12 requests, **all HTTP 200**, with durations
+`avg 4991ms · max 7689ms`. Well under the payload sizes the ladder would reach,
+and well over the 6000ms stall threshold. The transport was not stalled; four
+concurrent payloads over a path with a ~1.3s RTT simply take that long.
+
+**Mechanics:** the stall test was `performance.now() - lastBytesTime > 6000`
+unconditionally. In Firefox no byte signal arrives during a request, so
+`lastBytesTime` is only set at request start and request completion. A request
+that legitimately runs 7.7s trips the detector at 6s and the phase aborts and
+blames the link.
+
+**Resolution:** two rules, because "slow" and "hung" are genuinely
+indistinguishable mid-request when the browser emits no progress events:
+
+1. Judge a stall only when `inFlight === 0`. A request in flight is bounded by
+   `PHASE_TIMEOUT_MS` and the caller's 12.5s hard backstop, so liveness is still
+   guaranteed — and the phase reports its measured partial value instead of `0.0`.
+2. Calibrate the between-request gap limit from the longest completed request:
+   `max(STALL_THRESHOLD_MS, longestRequestMs * 2)`. The 6000ms floor is never
+   lowered.
+
+**Alternative rejected:** bootstrapping the limit from the loaded-ping samples.
+The pings are themselves subject to the same slow path, and they arrive on a
+1s interval that says nothing about payload duration. `longestRequestMs` already
+contains exactly the fact we need.
+
+**Caught by:** `tests/benchmarkUpload.test.js` — a link whose requests each take
+`STALL_THRESHOLD_MS + 1200ms` must return `stalled === false` and
+`bandwidth > 0`.
+
 ---
 
 ## 2026-11-06 — Daily review (04:35 EST)

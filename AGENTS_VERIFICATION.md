@@ -21,9 +21,9 @@ actually run against the commit it claims to cover.
 
 | File | Lines (before → after) | Changed line ranges |
 | --- | --- | --- |
-| `src/utils/benchmarkEngine.js` | 683 → 738 | 168–176 (`addBytes` delegates to the extracted prune), 178-replaced (`pruneWindow()`), 180–222 (`addBatch(bytes, elapsedMs)` slices a bulk credit across the request), 561–575 (2xx credits the remainder through `addBatch` instead of `addBytes`) |
+| `src/utils/benchmarkEngine.js` | 683 → 762 | 168–176 (`addBytes` delegates to the extracted prune), 180–222 (`addBatch(bytes, elapsedMs)` slices a bulk credit across the request), `pruneWindow()`, 268 (`checkStall(limitMs)` takes a limit), 561–575 (2xx credits the remainder through `addBatch`), 636–663 (`inFlight` / `longestRequestMs` gate and calibrate the upload stall limit, `inFlight` released in `finally`) |
 | `tests/throughputCalculator.test.js` | 63 → 100 | +3 tests: batch credit reads the observed rate, repeated batches hold it, window total stays equal to the chunk sum |
-| `tests/benchmarkUpload.test.js` | 198 → 232 | fake `XMLHttpRequest` spreads Chrome `progress` events across the request; +1 test bounding a single-request-per-stream link to 2–20 Mbps |
+| `tests/benchmarkUpload.test.js` | 198 → 257 | node environment pragma; fake `XMLHttpRequest` spreads Chrome `progress` events across the request; +2 tests (single-request link bounded to 2–20 Mbps; a link whose requests exceed the floor is not stalled) |
 | `CHANGELOG.md`, `AGENTS_VERIFICATION.md`, `DEBUGGING_NOTES.md`, `Continued Development Plan.md` | — | this run's entries |
 
 ### Verification (verbatim)
@@ -52,16 +52,32 @@ actually run against the commit it claims to cover.
 `npx vitest run tests/benchmarkUpload.test.js`:
 
 ```
- ✓ byte accounting > credits bytes when the browser emits only loadstart/load/loadend (Firefox) 1037ms
- ✓ byte accounting > credits the same bytes once when progress and completion events both fire (Chrome) 2566ms
- ✓ byte accounting > keeps a non-2xx rejection out of the throughput reading 638ms
- ✓ byte accounting > reports the observed rate for a single-request link, not the window floor 239ms
- ✓ chunk ladder > starts every stream at 512 KiB 3ms
- ✓ chunk ladder > climbs the ladder once the measured rung fits inside the stall budget 477ms
- ✓ chunk ladder > holds the rung when the next one could not finish before the stall window 91ms
+ ✓ byte accounting > credits bytes when the browser emits only loadstart/load/loadend (Firefox) 8479ms
+ ✓ byte accounting > credits the same bytes once when progress and completion events both fire (Chrome) 7128ms
+ ✓ byte accounting > keeps a non-2xx rejection out of the throughput reading 716ms
+ ✓ byte accounting > reports the observed rate for a single-request link, not the window floor 1116ms
+ ✓ byte accounting > does not call a high-latency link stalled when its requests exceed the floor 161ms
+ ✓ chunk ladder > starts every stream at 512 KiB 401ms
+ ✓ chunk ladder > climbs the ladder once the measured rung fits inside the stall budget 480ms
+ ✓ chunk ladder > holds the rung when the next one could not finish before the stall window 400ms
  Test Files  1 passed (1)
-      Tests  7 passed (7)
+      Tests  8 passed (8)
 ```
+
+### Stall calibration — evidence and change
+
+Live, in-page against production, four concurrent 512 KiB uploads looped for 12s:
+
+```
+requests: 12, non-200: 0, avg duration 4991ms, max duration 7689ms
+```
+
+Every request succeeded and one exceeded the absolute 6000ms threshold, which is
+what produced `Upload 0.0 Mbps` + *"stall detected during upload"* on the edge.
+The upload phase now (a) judges a stall only when `inFlight === 0`, because a
+request in flight is bounded by the phase budget and cannot be classified mid-
+flight without a byte signal, and (b) calibrates the between-request gap limit to
+`max(STALL_THRESHOLD_MS, longestRequestMs * 2)`. The floor is never lowered.
 
 `npm run build`:
 

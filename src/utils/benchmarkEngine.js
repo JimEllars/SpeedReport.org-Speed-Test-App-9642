@@ -143,6 +143,12 @@ async function probeLoadedPing(signal) {
 // events to 250-500ms granularity, and large uploads can legitimately report no
 // new bytes for several seconds. A 6000ms floor keeps slow-but-alive links from
 // being torn down mid-phase.
+//
+// Upload phases calibrate above this floor from their own observed request
+// durations: four concurrent 512 KiB payloads over a high-latency path can each
+// take longer than 6s while the link is perfectly healthy, which is what a live
+// edge test on a ~1.3s-RTT path showed (requests of 1.1-7.7s, every one a 200).
+// The floor is never lowered.
 export const STALL_THRESHOLD_MS = 6000;
 
 // Phase budgets. The engine's internal timeout must be strictly smaller than the
@@ -265,8 +271,8 @@ export class ThroughputCalculator {
     return sorted[idx] || this.getLiveSpeedMbps();
   }
 
-  checkStall() {
-    return (performance.now() - this.lastBytesTime) > STALL_THRESHOLD_MS;
+  checkStall(limitMs = STALL_THRESHOLD_MS) {
+    return (performance.now() - this.lastBytesTime) > limitMs;
   }
 
   /**
@@ -622,12 +628,29 @@ export async function measureUpload(onProgress = () => {}, signal) {
     if (latency !== null) pings.push(latency);
   }, 1000);
 
+  // Tracked before any stream starts so the first completion can read it. The
+  // longest completed request is also what the stall limit calibrates against.
+  let activeStreams = 4;
+  let longestRequestMs = 0;
+  let inFlight = 0;
+
   let progressIntervalId = setInterval(() => {
-    if (calculator.checkStall()) {
+    // A browser that emits no upload progress events gives no byte signal while a
+    // payload is in flight, so "slow" and "hung" are indistinguishable until the
+    // request settles. Two rules follow from that:
+    //
+    // 1. Judge a stall only between requests. A request in flight is bounded by
+    //    the phase budget, and the caller's hard backstop closes it regardless;
+    //    calling it stalled mid-flight is a guess, and on a live edge test with a
+    //    ~1.3s RTT it was the wrong guess (requests of 1.1-7.7s, every one 200).
+    // 2. Give the gap between requests room proportional to the request that just
+    //    completed, never less than the 6000ms floor.
+    const stallLimit = Math.max(STALL_THRESHOLD_MS, longestRequestMs * 2);
+    if (inFlight === 0 && calculator.checkStall(stallLimit)) {
       stalled = true;
       // See measureDownload: emit exactly one stall event per phase.
       clearInterval(progressIntervalId);
-      trackEvent('network_stall', { phase: 'UPLOAD' });
+      trackEvent('network_stall', { phase: 'UPLOAD', limitMs: stallLimit });
       phaseController.abort(new Error('Network stall detected during upload'));
       return;
     }
@@ -637,9 +660,6 @@ export async function measureUpload(onProgress = () => {}, signal) {
     onProgress(round(calculator.getLiveSpeedMbps()), lastPing);
   }, 50);
 
-  // Tracked before any stream starts so the first completion can read it.
-  let activeStreams = 4;
-
   const startStream = async () => {
     let ladderIndex = 0;
 
@@ -648,9 +668,18 @@ export async function measureUpload(onProgress = () => {}, signal) {
         Math.min(ladderIndex, UPLOAD_CHUNK_LADDER_BYTES.length - 1)
       ];
 
-      const { bytes, ms } = await uploadPayloadWithProgress(
-        getUploadPayload(size), calculator, phaseSignal
-      );
+      inFlight += 1;
+      let sent;
+      try {
+        sent = await uploadPayloadWithProgress(
+          getUploadPayload(size), calculator, phaseSignal
+        );
+      } finally {
+        inFlight -= 1;
+      }
+      const { bytes, ms } = sent;
+
+      if (ms > longestRequestMs) longestRequestMs = ms;
 
       if (signal?.aborted || phaseFinished) return;
 
