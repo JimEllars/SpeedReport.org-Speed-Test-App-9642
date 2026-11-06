@@ -38,6 +38,7 @@ those.
 | Ladder climbs only when the next rung projects inside half the stall window | ✅ 2026-11-06 |
 | Upload in flight counts as activity, so a slow-but-alive link is not stalled | ✅ 2026-11-06 |
 | Bulk byte credit spread over the request duration (~100ms slices) | ✅ 2026-11-06 |
+| Upload stall judged only between requests, gap limit calibrated from the longest request | ✅ 2026-11-06 |
 
 **Why:** browser progress callbacks are throttled to 250–500ms. A 200ms rolling
 window emptied between callbacks on high-latency links, so the gauge snapped to

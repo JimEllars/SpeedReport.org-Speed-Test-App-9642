@@ -1,3 +1,8 @@
+// @vitest-environment node
+// No DOM is needed: measureUpload touches AbortController, performance.now and
+// timers, and XMLHttpRequest is a double. A jsdom environment cost ~29s of worker
+// startup per file on the review host for nothing, and pushed this file past
+// vitest's 60s pool timeout.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { measureUpload, STALL_THRESHOLD_MS } from '../src/utils/benchmarkEngine';
 
@@ -165,6 +170,18 @@ describe('measureUpload byte accounting', () => {
 
     expect(result.bandwidth).toBeGreaterThan(2);
     expect(result.bandwidth).toBeLessThan(20);
+  });
+
+  it('does not call a high-latency link stalled when its requests exceed the floor', async () => {
+    // A single request longer than the 6000ms stall floor. With an absolute
+    // threshold the phase aborted and reported 0.0 Mbps plus a stall banner;
+    // a live edge test on a ~1.3s-RTT path produced request times of 1.1-7.7s,
+    // every one of them HTTP 200.
+    FakeXHR.latencyMs = STALL_THRESHOLD_MS + 1200;
+    const result = await runPhase(10000);
+
+    expect(result.stalled).toBe(false);
+    expect(result.bandwidth).toBeGreaterThan(0);
   });
 });
 

@@ -23,19 +23,35 @@ testing the deployed build rather than the diff.
 
 ### Added
 
-- **3 calculator tests + 1 upload test.** `tests/throughputCalculator.test.js`:
+- **3 calculator tests + 2 upload tests.** `tests/throughputCalculator.test.js`:
   a 512 KiB / 1900ms batch reads ~2.2 Mbps rather than 419, five repeated batches
   hold the observed rate in the percentile history, and `totalBytesInWindow`
   stays equal to the sum of the chunk list after a batch (the prune now runs
   inside `addBatch`). `tests/benchmarkUpload.test.js`: a single-request-per-stream
-  link reports 2–20 Mbps, not the window floor. The fake `XMLHttpRequest` now
+  link reports 2–20 Mbps, not the window floor, and a link whose requests each
+  exceed the 6s floor is not reported as stalled. The fake `XMLHttpRequest` now
   spreads Chrome-style `progress` events across the request instead of firing
   them in one burst.
+
+### Fixed
+
+- **A high-latency link was reported as a stall with `0.0 Mbps` upload.** Live
+  edge measurement of four concurrent 512 KiB streams showed request times of
+  1.1–7.7s, every one HTTP 200 — past the absolute 6s threshold, so the phase
+  aborted and blamed the network. The upload phase now stops judging a stall
+  while a request is in flight (without progress events, "slow" and "hung" are
+  indistinguishable until the request settles, and the phase budget bounds it)
+  and calibrates the between-request gap limit from the longest request that has
+  completed, never below the 6000ms floor.
+  `src/utils/benchmarkEngine.js`
+- **`tests/benchmarkUpload.test.js` runs in the node environment.** It needs no
+  DOM, and jsdom cost ~29s of worker startup per file on a loaded host — enough
+  to trip vitest's hardcoded 60s pool timeout.
 
 ### Verified
 
 `npm run lint` clean · `tests/throughputCalculator.test.js` 7/7 ·
-`tests/benchmarkUpload.test.js` 7/7 · `npm run build` 644 modules, 309.99 kB gzip ·
+`tests/benchmarkUpload.test.js` 8/8 · `npm run build` 644 modules, 309.99 kB gzip ·
 full isolated suite and CI on the pull request. Verbatim output in
 `AGENTS_VERIFICATION.md`.
 
