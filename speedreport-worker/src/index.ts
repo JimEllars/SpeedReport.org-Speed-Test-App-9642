@@ -2,6 +2,7 @@ import { handleDownload } from "./download";
 import { runExecutiveReportCron } from "./executiveReporter";
 import { getCorsHeaders, json, telemetryHeaders, errorJson } from "./http";
 import { handleMeta } from "./meta";
+import { handleServiceability } from "./serviceability";
 import { handleUpload } from "./upload";
 import { handleTelemetry, handleLeadSubmission } from "./telemetry";
 
@@ -9,6 +10,7 @@ interface WorkerEnv {
   ASSETS: Fetcher;
   TELEMETRY: AnalyticsEngineDataset;
   PROSPECT_STORE?: KVNamespace;
+  SERVICEABILITY?: KVNamespace;
   ADMIN_SECRET?: string;
   RESEND_API_KEY?: string;
   REPORT_RECIPIENT_TO?: string;
@@ -34,12 +36,19 @@ function healthPayload(env: WorkerEnv) {
   const prospectStore = env.PROSPECT_STORE ? "bound" : "unbound";
   const leadForwarding =
     env.AXIM_CORE_URL && env.AXIM_INTERNAL_KEY ? "configured" : "unconfigured";
+  // Coverage feed state. `unbound` is the honest default: the deal cards then
+  // resolve every ZIP as `unknown` and the site sells nothing rather than
+  // routing unverified leads into a program that charges back for them.
+  const serviceability = env.SERVICEABILITY ? "bound" : "unbound";
 
   return {
     status: "healthy",
     timestamp: Date.now(),
-    degraded: prospectStore === "unbound" || leadForwarding === "unconfigured",
-    dependencies: { prospectStore, leadForwarding },
+    degraded:
+      prospectStore === "unbound" ||
+      leadForwarding === "unconfigured" ||
+      serviceability === "unbound",
+    dependencies: { prospectStore, leadForwarding, serviceability },
   };
 }
 
@@ -134,6 +143,8 @@ export default {
           return json(healthPayload(env), 200, request, env);
         case "/api/meta":
           return handleMeta(request, env);
+        case "/api/serviceability":
+          return handleServiceability(request, env);
         case "/api/ping":
           return new Response(null, {
             status: 204,
