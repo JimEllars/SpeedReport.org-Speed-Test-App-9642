@@ -108,10 +108,10 @@ export default function FiberLeadCard({ report }) {
         <div>
           <h3 className="text-xl font-bold text-slate-100 flex items-center gap-2 mb-2">
             <SafeIcon icon={FiZap} className="text-amber-400" />
-            Looking for Faster, Symmetrical Gigabit Fiber?
+            Looking for faster, symmetrical fiber?
           </h3>
           <p className="text-slate-400 text-sm">
-            Check if enterprise-grade fiber is available at your location, or email this official report directly to your IT team.
+            Check whether faster fiber is available at your address, or email this report to whoever handles your connection — your provider, your landlord, or your IT team.
           </p>
         </div>
 
@@ -119,7 +119,7 @@ export default function FiberLeadCard({ report }) {
           <div className="flex-1">
             <input
               type="email"
-              placeholder="IT or Personal Email (Optional)"
+              placeholder="Email (optional)"
               className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-slate-200 focus:outline-none focus:border-blue-500 disabled:opacity-50"
               value={email}
               onChange={(e) => setEmail(e.target.value)}

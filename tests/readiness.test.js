@@ -3,7 +3,7 @@ import { formatDuration, getReadiness } from '../src/utils/readiness';
 
 describe('Readiness Utilities', () => {
   describe('getReadiness', () => {
-    it('returns Enterprise Ready for gigabit throughputs and low latency', () => {
+    it('returns Excellent for gigabit throughputs and low latency', () => {
       const metrics = {
         download: 1000,
         upload: 1000,
@@ -14,12 +14,12 @@ describe('Readiness Utilities', () => {
         bufferbloat: 'A'
       };
       const result = getReadiness(metrics);
-      expect(result.grade).toBe('Enterprise Ready');
+      expect(result.grade).toBe('Excellent');
       expect(result.strongLatency).toBe(true);
       expect(result.strongVideo).toBe(true);
     });
 
-    it('returns Needs Improvement for high loaded latency (>150ms)', () => {
+    it('returns Limited for high loaded latency (>150ms)', () => {
       const metrics = {
         download: 1000,
         upload: 1000,
@@ -30,7 +30,7 @@ describe('Readiness Utilities', () => {
         bufferbloat: 'A'
       };
       const result = getReadiness(metrics);
-      expect(result.grade).toBe('Needs Improvement');
+      expect(result.grade).toBe('Limited');
       expect(result.strongLatency).toBe(false);
     });
   });

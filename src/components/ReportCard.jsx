@@ -67,8 +67,8 @@ export default function ReportCard({ report }) {
         <span className="eyebrow">Verification certificate ready</span>
         <h2>Your official network report</h2>
         <p>
-          Document performance, network identity, test node, and business readiness
-          for IT or ISP review.
+          Document performance, network identity, test node and plain-language
+          readiness — for your own records, or to share with your provider.
         </p>
         <span className="certificate">
           <SafeIcon icon={FiShield} /> {report.id}

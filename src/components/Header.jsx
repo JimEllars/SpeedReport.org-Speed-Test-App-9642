@@ -58,7 +58,7 @@ export default function Header() {
         <span className="brand-mark"><SafeIcon icon={FiActivity} /></span>
         <div>
           <strong>SpeedReport<span>.org</span></strong>
-          <small>Enterprise network diagnostics</small>
+          <small>Connection speed &amp; diagnostics</small>
         </div>
       </div>
       <div className="trust">

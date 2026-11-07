@@ -12,6 +12,7 @@ function makeEnv(overrides: Record<string, unknown> = {}) {
     ASSETS: { fetch: vi.fn().mockResolvedValue(new Response('asset', { status: 200 })) },
     TELEMETRY: { writeDataPoint: vi.fn() },
     PROSPECT_STORE: { get: vi.fn(), put: vi.fn(), list: vi.fn() },
+    SERVICEABILITY: { get: vi.fn(), put: vi.fn(), list: vi.fn() },
     ALLOWED_ORIGINS: STAGING_ORIGIN,
     AXIM_CORE_URL: 'https://core.internal.invalid',
     AXIM_INTERNAL_KEY: 'test-internal-key',
@@ -73,6 +74,7 @@ describe('health surface', () => {
     expect(body.degraded).toBe(false);
     expect(body.dependencies.prospectStore).toBe('bound');
     expect(body.dependencies.leadForwarding).toBe('configured');
+    expect(body.dependencies.serviceability).toBe('bound');
   });
 
   it('never leaks the Core endpoint or key through health', async () => {

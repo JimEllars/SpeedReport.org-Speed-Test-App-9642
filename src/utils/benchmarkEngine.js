@@ -318,6 +318,22 @@ async function consumeDownload(bytes, calculator, signal) {
   }
 }
 
+/**
+ * A per-stream failure used to be logged as a bare `console.error(e)`, which in
+ * a browser prints "Error" and nothing else. When the upload phase returned 0
+ * Mbps there was therefore no record of *why* any stream had failed, which is
+ * the difference between "our server rejected it" and "the request never left".
+ */
+function logStreamFailure(error, phase) {
+  if (error?.name === 'AbortError') return;
+  console.error(JSON.stringify({
+    event: 'stream_failed',
+    phase,
+    name: error?.name ?? 'Error',
+    message: error?.message ?? String(error),
+  }));
+}
+
 export async function measureDownload(onProgress = () => {}, signal) {
   let phaseFinished = false;
   let stalled = false;
@@ -384,14 +400,14 @@ export async function measureDownload(onProgress = () => {}, signal) {
              activeStreams--;
              return;
          }
-         return startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); });
+         return startStream().catch((e) => logStreamFailure(e, 'DOWNLOAD'));
       }
     });
   };
 
   // Run 4 to 6 concurrent streams
   for (let i = 0; i < 4; i++) {
-    streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
+    streams.push(startStream().catch((e) => logStreamFailure(e, 'DOWNLOAD')));
   }
 
   // Dynamic scaling checker
@@ -399,10 +415,10 @@ export async function measureDownload(onProgress = () => {}, signal) {
     const mbps = calculator.getLiveSpeedMbps();
     if (mbps > 400 && activeStreams < 8) {
       activeStreams++;
-      streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
+      streams.push(startStream().catch((e) => logStreamFailure(e, 'DOWNLOAD')));
     } else if (mbps > 150 && activeStreams < 6) {
       activeStreams++;
-      streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
+      streams.push(startStream().catch((e) => logStreamFailure(e, 'DOWNLOAD')));
     }
   }, 1000);
 
@@ -584,8 +600,19 @@ function uploadPayloadWithProgress(payload, calculator, phaseSignal) {
       }
       reject(new Error(`Upload endpoint rejected payload (HTTP ${status})`));
     };
-    const onError = () => { cleanup(); reject(new Error('Upload endpoint unavailable')); };
-    const onXhrAbort = () => { cleanup(); reject(new DOMException('The diagnostic was cancelled.', 'AbortError')); };
+    // XHR gives no reason for a network-level failure, and the two arms mean
+    // different things: an abort we caused is our own stall/timeout, while a
+    // genuine error means the request never completed. Collapsing both into
+    // "Upload endpoint unavailable" blamed the server for a local stall.
+    const onError = () => { cleanup(); reject(new Error('Upload request failed (network error)')); };
+    const onXhrAbort = () => {
+      cleanup();
+      if (phaseSignal?.aborted) {
+        reject(new DOMException('Network stall detected during upload', 'AbortError'));
+        return;
+      }
+      reject(new DOMException('The diagnostic was cancelled.', 'AbortError'));
+    };
 
     xhr.upload.addEventListener('loadstart', onUploadStart);
     xhr.upload.addEventListener('progress', onProgress);
@@ -711,17 +738,17 @@ export async function measureUpload(onProgress = () => {}, signal) {
 
   // Default 4 streams
   for (let i = 0; i < 4; i++) {
-    streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
+    streams.push(startStream().catch((e) => logStreamFailure(e, 'UPLOAD')));
   }
 
   let scalingInterval = setInterval(() => {
     const mbps = calculator.getLiveSpeedMbps();
     if (mbps > 400 && activeStreams < 8) {
       activeStreams++;
-      streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
+      streams.push(startStream().catch((e) => logStreamFailure(e, 'UPLOAD')));
     } else if (mbps > 150 && activeStreams < 6) {
       activeStreams++;
-      streams.push(startStream().catch(e => { if (e?.name !== 'AbortError') console.error(e); }));
+      streams.push(startStream().catch((e) => logStreamFailure(e, 'UPLOAD')));
     }
   }, 1000);
 

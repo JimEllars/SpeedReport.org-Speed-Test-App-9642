@@ -15,9 +15,9 @@ export default function ISPDetailsCard({ meta, metrics }) {
   const getRegionalBenchmark = () => {
     if (!metrics || !metrics.download) return null;
     const speed = Math.max(metrics.download, metrics.upload || 0);
-    if (speed > 500) return 'Top 5% Commercial Fiber';
-    if (speed >= 100) return 'Above Regional Average';
-    return 'Standard Broadband Tier';
+    if (speed > 500) return 'Gigabit-class';
+    if (speed >= 100) return 'Above the regional average';
+    return 'Everyday broadband';
   };
 
   const benchmark = getRegionalBenchmark();
