@@ -3,7 +3,9 @@ import { useState } from 'react';
 import * as FiIcons from 'react-icons/fi';
 import SafeIcon from '../common/SafeIcon';
 import { downloadJsonReport, printReport } from '../utils/reportActions';
-import { downloadReport } from '../utils/pdfReportGenerator';
+// Lazy facade: keeps pdf-lib + qrcode out of the main chunk until a PDF is
+// actually requested. See src/utils/reportExport.js.
+import { downloadReport } from '../utils/reportExport';
 
 const {
   FiDownload,

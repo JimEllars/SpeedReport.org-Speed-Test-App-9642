@@ -4,7 +4,9 @@ import SafeIcon from '../common/SafeIcon';
 import { formatDuration, getReadiness } from '../utils/readiness';
 import { sendAnonymousTelemetry } from '../utils/telemetry';
 import { evaluateSlaCompliance } from '../utils/slaEngine';
-import { downloadReport } from '../utils/pdfReportGenerator';
+// Lazy facade: keeps pdf-lib + qrcode out of the main chunk until a PDF is
+// actually requested. See src/utils/reportExport.js.
+import { downloadReport } from '../utils/reportExport';
 
 const { FiPhoneCall, FiVideo, FiCloud, FiUsers, FiCheckCircle, FiFileText, FiShield, FiAlertTriangle, FiXCircle } = FiIcons;
 

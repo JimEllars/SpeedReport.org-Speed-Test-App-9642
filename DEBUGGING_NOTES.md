@@ -6,6 +6,109 @@ notes alone.
 
 ---
 
+## 2026-11-07 — Daily review (04:35 EST)
+
+### 1. The suite was green while a test file had never run
+
+**Symptom:** `npm test` printed `Test Files 13 passed (13)` / `Tests 95 passed
+(95)` and, underneath, one *unhandled error* — exit code 1, but no failing test
+and no line naming what was missing. The reports directory has 14 test files.
+
+**Mechanics:** `tests/speedGauge.test.jsx` never executed. The pool could not
+boot its worker inside vitest's **hardcoded** start budget:
+
+```js
+const START_TIMEOUT = 6e4;   // vitest 5.0.3, index.DpLw24bj.js:10760
+```
+
+There is no config knob for it — vitest 4 removed `poolOptions`, so the earlier
+note ("no resolution available") was half right. What made this file special was
+its import cost, measured directly on this host with plain `node`:
+
+| Module | Import time |
+| --- | --- |
+| `jsdom` | 28,080 ms |
+| `framer-motion` | 7,844 ms |
+| `@testing-library/react` | 7,274 ms |
+| `react-icons/fi` (barrel, 864 icons) | 797 ms |
+
+jsdom alone is 28s of *disk and parse*, before a single assertion runs, and
+`vitest.config.js` was paying it for all 14 files because
+`environment: 'jsdom'` was set globally. With 2 vCPUs and four forks booting
+simultaneously, at least one worker lost the race every run. The proof that this
+was environmental rather than a defect in the component: the same file passed
+alone on some runs (62.3s) and failed on others, and a probe that imported the
+component and rendered it without the fake-timer harness behaved identically.
+
+The dangerous part is the reporting shape, not the slowness: **a file that never
+starts is not a failing test.** Only `Errors 1` distinguished this from a
+genuinely green run, and it is easy to skim past.
+
+**Resolution:** invert the default. `environment: 'node'` in
+`vitest.config.js`, with `// @vitest-environment jsdom` docblocks on the five
+files that actually assert on rendered markup, storage or `sendBeacon`
+(`speedGauge`, `useSpeedTest`, `useSpeedTestStall`, `telemetry`, `vault`). Files
+that only exercise pure logic get `// @vitest-environment node` explicitly, so
+the choice is visible at the top of each file instead of inherited by accident.
+Result: 15/15 files, 103 tests, 194.46s → 109.92s, and gauge startup dropped from
+~9.5s to ~5.2s per worker.
+
+**Rule for future runs:** if `Errors` is non-zero, the run is not green, even
+when every count on the line above it is green. `Test Files N passed` is only
+meaningful next to the count of files on disk:
+
+```bash
+ls tests/*.test.* | wc -l    # must equal the "Test Files N passed" count
+```
+
+### 2. The main bundle was carrying a PDF library nobody had asked for
+
+**Symptom:** `dist/assets/index-*.js` was 896.94 kB (310.18 kB gzip) for a
+single-page speed test.
+
+**Mechanics:** `pdf-lib` (with its standard-font and encoding tables) plus
+`qrcode` were imported statically by `pdfReportGenerator.js`, which three
+components imported at module scope — `ReportCard`, `BusinessAuditCard`,
+`TestHistoryVault`. A visitor who only ran a speed test and read the gauge still
+downloaded, parsed and executed ~460 kB of PDF machinery.
+
+**Resolution:** `src/utils/reportExport.js` is a two-line facade whose
+`downloadReport()` does `await import('./pdfReportGenerator.js')`. Rollup splits
+it automatically: main chunk 896.94 → **435.28 kB** (gzip 310.18 → **119.74
+kB**), PDF chunk 460.59 kB fetched on first export.
+
+Two follow-on details matter:
+- The inline click handler in `TestHistoryVault` had no `.catch()`. That was
+  tolerable when the only failure was a rendering error; with a dynamic import it
+  also covers a failed chunk fetch (offline, or a deploy that rotated the hashed
+  filename), which would otherwise be an unhandled rejection with no user-visible
+  effect at all.
+- Nothing in the suite exercised `downloadReport`, so a renamed module or a
+  dropped export would only ever fail on a live click. `tests/reportExport.test.js`
+  now runs the real generator end to end under a node environment with `document`
+  and `URL.createObjectURL` stubbed.
+
+### 3. The upload ladder's first rung was also its measurement floor
+
+**Symptom:** none in production logs — this one is from reading the guard, not
+from a report.
+
+**Mechanics:** the ladder only climbs when the *next* rung projects inside half
+the stall window (`projectedMs <= STALL_THRESHOLD_MS / 2`). That guard is
+correct, but it means the first rung is the smallest measurement the phase can
+ever make. With 512 KiB first, a link slower than ~700 kbps cannot finish one
+request inside the 6000ms floor and the phase ends as `stalled` with
+`bandwidth: 0`.
+
+**Resolution:** the ladder now starts at 256 KiB (256 KiB → 512 KiB → 1 MiB →
+2 MiB → 4 MiB). Verified with a `FakeXHR.bytesPerMs` mode that makes request
+duration proportional to payload size — a fixed `latencyMs` cannot model this
+defect, because the defect is about how duration scales with size. At ~620 kbps
+per stream, 256 KiB takes 3.4s (measured) where 512 KiB would take 6.8s
+(stalled); the new test fails against the old rung.
+
+---
+
 ## 2026-11-06 — Follow-up (05:55 EST)
 
 ### 5. The upload fix shipped `419.4 Mbps` — crediting a batch at one instant
@@ -211,9 +314,10 @@ environment creation on this 2-vCPU host takes ~29 s per file. It is
 infrastructure, not code — no `poolOptions.startTimeout` exists to raise it
 (vitest 4 removed `poolOptions`).
 
-**Resolution:** none in the codebase. Recorded as an environment limit; the
-verification entry states which files were proven in which run rather than
-claiming a single green process.
+**Resolution:** none at the time. **Superseded 2026-11-07** — the budget cannot be
+raised, but it no longer needs to be: the default environment is `node` and only
+five files opt into jsdom, which brought every worker back under the 60s budget.
+See 2026-11-07 #1.
 
 ---
 

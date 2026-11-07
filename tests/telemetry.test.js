@@ -1,3 +1,7 @@
+// @vitest-environment jsdom
+// This file asserts on rendered markup / storage / beacon behaviour, so it needs
+// a DOM. The suite default is `node` to keep jsdom's ~29s load out of the files
+// that do not (see vitest.config.js).
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import * as telemetry from '../src/utils/telemetry';
 

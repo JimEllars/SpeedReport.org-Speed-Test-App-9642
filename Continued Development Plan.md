@@ -1,6 +1,6 @@
 # SpeedReport.org — Continued Development Plan
 
-_Last reconciled: 2026-11-06 (daily 04:35 EST review)_
+_Last reconciled: 2026-11-07 (daily 04:35 EST review)_
 
 This document tracks the forward roadmap for the SpeedReport.org edge engine and
 the anonymous AXiM Core ingress feed. It is reconciled at the end of every daily
@@ -39,6 +39,7 @@ those.
 | Upload in flight counts as activity, so a slow-but-alive link is not stalled | ✅ 2026-11-06 |
 | Bulk byte credit spread over the request duration (~100ms slices) | ✅ 2026-11-06 |
 | Upload stall judged only between requests, gap limit calibrated from the longest request | ✅ 2026-11-06 |
+| 256 KiB first rung so sub-700 kbps uplinks can be measured at all | ✅ 2026-11-07 |
 
 **Why:** browser progress callbacks are throttled to 250–500ms. A 200ms rolling
 window emptied between callbacks on high-latency links, so the gauge snapped to
@@ -56,10 +57,11 @@ encodes both sequences.
 
 Remaining known limit: a single request that cannot finish inside
 `STALL_THRESHOLD_MS` still ends the phase as stalled. The ladder guard keeps the
-chosen rung proportional to measured throughput, which covers slow links whose
-first 512 KiB rung itself fits; a link slower than ~700 kbps cannot be measured
-by this phase shape at all and would need a smaller first rung (a 256 KiB step is
-the obvious next lever, queued under *Next up*).
+chosen rung proportional to measured throughput, and since 2026-11-07 the first
+rung is 256 KiB, so a link down to ~350 kbps completes a request inside the
+window. Below that the phase shape itself is the limit: a further widening would
+need a rung below 256 KiB, which mostly measures the round trip rather than the
+rate.
 
 ### 2. Lead delivery reliability (satellite → Core)
 
@@ -158,41 +160,42 @@ DLQ and the lead rate limiter both degrade to logged no-ops.
 
 ## Next up (queued, not started)
 
-- **A 256 KiB first rung for very slow uplinks.** The ladder now refuses to climb
-  past what the measured transfer supports, but the first rung is still 512 KiB,
-  so a link slower than ~700 kbps cannot finish one request inside the 6s stall
-  window and is reported as stalled. One extra step costs a single round trip on
-  fast links. Cover it with a `FakeXHR.latencyMs` above the stall window in
-  `tests/benchmarkUpload.test.js`.
 - **Upload failure reason never reaches the UI.** A phase where every stream is
   rejected (`HTTP 404`/`503`) returns `{ bandwidth: 0, stalled: false }` and the
   copy says *"Test completed partially due to network instability"*. PR #71's
   `failure.js` classification is the right carrier; not duplicated here.
-- **`isolate: false` for vitest.** jsdom environment creation is still ~72% of
-  suite runtime (12 files, one environment each, ~15s startup apiece — 310s wall
-  clock for 73 tests). Sharing workers would cut most of that, but only once the
-  suite is large enough to justify loosening per-file isolation. The suite got
-  slower this run (2 new files), so it moves up the queue.
-- **Bundle size.** The main chunk is ~896 kB minified (310 kB gzip). Route-level
-  code splitting for the report/PDF path is the obvious win.
+- **`isolate: false` for vitest.** Environment startup is still ~63% of suite
+  runtime, but only five files create a jsdom environment now (the other ten run
+  on `node`), so the ceiling on this saving has dropped from ~72% to well under
+  half. Worth doing once the global-stub leak below is fixed; until then the
+  saving does not pay for the lost per-file isolation.
 - **`ALLOWED_ORIGINS` accepts any `*.pages.dev` origin.** Convenient for preview
   deploys, but it means any Cloudflare Pages project can read API responses. Tighten
   to an explicit preview allowlist once preview deployments are settled.
 - **Dependabot backlog.** Five open PRs (#67 follow-redirects, #64 undici+wrangler,
   #63 vite, #51 and #49 sharp). All checks green; waiting on maintainer triage
   because they cross the dependency graph of a pipeline that deploys on `main`.
-- **Local suite needs worker reuse, but isolation first.** 14 files now cost
-  ~560s and occasionally cannot start at all when the host is loaded — `START_TIMEOUT`
-  is hardcoded at 60s in vitest 5.0.3 and jsdom environment creation takes ~29s per
-  file here. `--no-isolate` finishes the run but leaks global stubs: after
-  `tests/telemetryIngress.test.ts` stubs `fetch`, 7 tests in
-  `axim-core`/`useSpeedTestStall` fail until they run alone. Restore those globals
-  in `afterEach` before flipping the flag. CI is unaffected (~40s for the job).
+- **Global stubs leak between files, blocking `--no-isolate`.** `--no-isolate`
+  finishes the run but leaks: after `tests/telemetryIngress.test.ts` stubs
+  `fetch`, 7 tests in `axim-core`/`useSpeedTestStall` fail until they run alone.
+  Restore those globals in `afterEach` before flipping the flag. The *fragility*
+  side of this is fixed (see the 2026-11-07 done entry) — the suite now runs
+  15/15 in 110s — so what remains is purely the isolation-vs-speed trade.
 
 ---
 
 ## Done log
 
+- **2026-11-07** — Suite made honest: `tests/speedGauge.test.jsx` had never run
+  (13/14 files reporting green, because `environment: 'jsdom'` on every file blew
+  vitest's hardcoded 60s worker-start timeout). Default environment is now `node`
+  with a jsdom docblock on the five files that need a DOM — 15/15 files, 103
+  tests, 194.46s → 109.92s. Upload ladder gains a 256 KiB first rung, so a
+  ~620 kbps uplink is measured instead of stalled. Main chunk halved
+  (896.94 kB → 435.28 kB, gzip 310.18 → 119.74 kB) by moving pdf-lib + qrcode
+  behind a lazy `reportExport` facade, with an end-to-end export test so a broken
+  dynamic import cannot ship silently. Brief Step-4 items 1–5 re-audited against
+  source: all already shipped.
 - **2026-11-06 (follow-up)** — The first upload fix credited each payload at one
   instant, so production read `419.4 Mbps` on a 64 Mbps link (the rolling
   window's 10ms floor applied to a single 512 KiB chunk, adopted as the result by

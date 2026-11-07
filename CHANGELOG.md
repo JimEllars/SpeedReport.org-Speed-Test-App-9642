@@ -5,6 +5,55 @@ first and timestamped with the review window that produced them.
 
 ---
 
+## [2026-11-07] — 04:35 EST daily review
+
+Daily review. The headline is a gate that was lying: the suite reported green
+while one of its files never ran.
+
+### Fixed
+
+- **`tests/speedGauge.test.jsx` never executed.** `npm test` reported `13 files
+  passed / 95 tests` while the gauge's four regression tests — centre animation,
+  Mbps/Gbps scaling, and the phase readouts — were skipped entirely, because the
+  forks worker could not boot inside vitest's hardcoded 60s `START_TIMEOUT`
+  (`Failed to start forks worker`). The cause was `environment: 'jsdom'` applied
+  to every file: jsdom costs ~28s to load per worker on a loaded host, and the
+  gauge file piled `@testing-library/react` and `framer-motion` on top. The
+  default environment is now `node`; the five files that genuinely need a DOM opt
+  in with a `// @vitest-environment jsdom` docblock. Suite wall clock 194.46s →
+  109.92s and all 15 files run: `15 passed / 103 tests`. `vitest.config.js`,
+  the nine affected test files.
+
+### Added
+
+- **256 KiB first rung on the upload ladder.** The ladder refuses to climb past
+  what the measured transfer supports, so the bottom rung is also the smallest
+  measurement the engine can make. At 512 KiB a link slower than ~700 kbps could
+  not finish one request inside the 6s stall window and was scored as stalled —
+  precisely the bonded-copper and SDSL uplinks a B2B prospect most wants
+  benchmarked. `src/utils/benchmarkEngine.js`
+
+- **`reportExport.js` — lazy PDF entry point,** plus a test that runs the real
+  generator end to end.
+
+### Changed
+
+- **Main JS chunk halved: 896.94 kB → 435.28 kB (gzip 310.18 kB → 119.74 kB).**
+  pdf-lib and qrcode were pulled into the initial bundle by three components that
+  only need them when someone clicks "Download PDF". They now live in
+  `pdfReportGenerator-*.js` (460.59 kB) and load on first export.
+  `src/utils/reportExport.js`, `ReportCard.jsx`, `BusinessAuditCard.jsx`,
+  `TestHistoryVault.jsx`.
+
+### Tests
+
+- +1 upload test (a ~620 kbps uplink that a 512 KiB first rung could only stall
+  on; verified to fail against the old rung) and +3 export tests (PDF generated
+  and downloaded through the lazy import, SLA dossier variant, fingerprint
+  determinism). The fake `XMLHttpRequest` gained a `bytesPerMs` mode so request
+  time scales with payload size, which is what the ladder's decisions assume.
+  9 → 103 root tests; 38 worker tests unchanged.
+
 ## [2026-11-06] — 05:55 EST follow-up (same window)
 
 Correcting an artifact the 2026-11-06 fix introduced in production, found by
