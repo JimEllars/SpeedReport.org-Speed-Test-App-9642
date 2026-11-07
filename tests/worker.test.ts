@@ -1,3 +1,6 @@
+// @vitest-environment node
+// No DOM involved: pure formatting/aggregation logic. Kept on the node
+// environment so the file does not pay jsdom's ~29s startup (vitest.config.js).
 import { describe, expect, it, vi } from 'vitest';
 import worker from '../speedreport-worker/src/index';
 

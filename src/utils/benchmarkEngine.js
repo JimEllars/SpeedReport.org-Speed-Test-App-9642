@@ -459,7 +459,16 @@ function createUploadPayload(size) {
 // latency-bound connections spend the whole phase on a single request, and gave
 // huge links too little headroom to saturate. Each stream walks this ladder so
 // the phase produces measurable samples early and scales up as capacity allows.
+//
+// The first rung is 256 KiB rather than 512 KiB because the ladder may not climb
+// past what the measured transfer supports, so the bottom rung is also the
+// smallest thing this engine can measure. At 512 KiB a link slower than roughly
+// 700 kbps could not finish one request inside STALL_THRESHOLD_MS and was scored
+// as stalled - exactly the asymmetric SDSL and bonded-copper uplinks a B2B
+// prospect most wants benchmarked. One extra rung costs a single round trip on
+// fast links, where the guard climbs immediately.
 const UPLOAD_CHUNK_LADDER_BYTES = [
+  256 * 1024, // 256 KiB
   512 * 1024, // 512 KiB
   1024 * 1024, // 1 MiB
   2 * 1024 * 1024, // 2 MiB

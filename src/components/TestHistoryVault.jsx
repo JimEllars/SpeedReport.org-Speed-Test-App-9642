@@ -3,7 +3,9 @@ import { useState, useMemo } from 'react';
 import SafeIcon from '../common/SafeIcon';
 import { downloadHistoryCsv } from '../utils/reportActions';
 import './TestHistoryVault.css';
-import { downloadReport } from '../utils/pdfReportGenerator';
+// Lazy facade: keeps pdf-lib + qrcode out of the main chunk until a PDF is
+// actually requested. See src/utils/reportExport.js.
+import { downloadReport } from '../utils/reportExport';
 
 const {
   FiArchive,
@@ -205,7 +207,17 @@ export default function TestHistoryVault({ history, onClear, onSelect, onToggleP
                   </button>
                   <button
                     className="history-view"
-                    onClick={(e) => { e.stopPropagation(); downloadReport(test, { mode: 'SLA_DISPUTE_DOSSIER' }); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // The generator is a lazy chunk now, so this promise can
+                      // also reject on a failed chunk fetch (offline, or a
+                      // deploy that rotated the hashed filename). Swallowing it
+                      // silently was an unhandled rejection in the console with
+                      // no indication to the operator that nothing happened.
+                      downloadReport(test, { mode: 'SLA_DISPUTE_DOSSIER' }).catch((error) => {
+                        console.error('SLA dispute dossier export failed', error);
+                      });
+                    }}
                     aria-label={`Export Dispute Dossier for ${test.id}`}
                     title="Export SLA Dispute Dossier"
                   >

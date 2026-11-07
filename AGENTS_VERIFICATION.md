@@ -7,6 +7,173 @@ actually run against the commit it claims to cover.
 
 ---
 
+## Run: 2026-11-07 — 04:35 EST daily review
+
+- **Repository:** `JimEllars/SpeedReport.org-Speed-Test-App-9642`
+- **Base commit:** `935d311` (`fix(benchmark): stop calling a high-latency upload a stall (#74)`)
+- **Branch:** `feat/speedreport-2026-11-07-suite-green-slow-uplink-bundle`
+- **Human activity absorbed:** #72, #73, #74 merged in the last 24h (upload byte
+  crediting, batch-credit spreading, upload stall calibration). No human edits to
+  thresholds or styling outside those three, and `origin/main` was clean, so the
+  branch was cut directly from `935d311` with no rebase conflicts.
+- **Open PRs at start:** #71 (lead engine Phase 1, all checks green), plus five
+  Dependabot PRs (#67, #64, #63, #51, #49). None were touched: #71 is a large
+  feature branch owned by a prior sprint and the Dependabot PRs are awaiting
+  maintainer triage, as recorded in `Continued Development Plan.md`.
+
+### Baseline audit — one gate was lying
+
+`npm run lint` and `npm run build` were clean. `npm test` reported **13 files
+passed / 95 tests passed** — while `tests/speedGauge.test.jsx` had not run at
+all:
+
+```
+Error: [vitest-pool]: Failed to start forks worker for test files
+  /workspace/review/speedreport/tests/speedGauge.test.jsx
+Caused by: Error: [vitest-pool-runner]: Timeout waiting for worker to respond
+ Test Files  13 passed (13)
+      Tests  95 passed (95)
+```
+
+Four gauge regression tests were therefore not protected, and the failure was
+reported as an unhandled error rather than a failure, so a green-looking summary
+was possible. Root cause: `vitest.config.js` set `environment: 'jsdom'` for every
+file, and loading jsdom costs ~28s per worker on this host (`node -e` import of
+`jsdom` alone: 28,080ms). `START_TIMEOUT` is a hardcoded `60_000` in vitest
+5.0.3, so under load a worker could not boot before the pool gave up.
+`tests/speedGauge.test.jsx` also loads `@testing-library/react` (7.3s) and
+`framer-motion` (7.8s) on top of jsdom, which put it over the line on its own.
+
+### Files modified
+
+| File | Lines (before → after) | Changed line ranges |
+| --- | --- | --- |
+| `vitest.config.js` | 17 → 30 | 5–19 (`environment: 'jsdom'` → `'node'`, with the docblock convention and the reason recorded) |
+| `tests/speedGauge.test.jsx` | 141 → 145 | 1–4 (jsdom docblock) |
+| `tests/useSpeedTest.test.js` | — | 1–4 (jsdom docblock) |
+| `tests/useSpeedTestStall.test.js` | — | 1–4 (jsdom docblock) |
+| `tests/vault.test.js` | — | 1–4 (jsdom docblock) |
+| `tests/telemetry.test.js` | — | 1–4 (jsdom docblock) |
+| `tests/readiness.test.js` | — | 1–3 (node docblock) |
+| `tests/reporter.test.js` | — | 1–3 (node docblock) |
+| `tests/worker.test.ts` | — | 1–3 (node docblock) |
+| `src/utils/benchmarkEngine.js` | 762 → 771 | 450–472 (`UPLOAD_CHUNK_LADDER_BYTES` gains a 256 KiB first rung) |
+| `tests/benchmarkUpload.test.js` | 257 → 287 | `FakeXHR.bytesPerMs` size-proportional request timing; ladder block resets it; `FIRST_RUNG` 512 KiB → 256 KiB; +1 slow-uplink test |
+| `src/utils/reportExport.js` | new, 17 | lazy `downloadReport` facade |
+| `src/components/ReportCard.jsx` | — | 6–8 (import the facade) |
+| `src/components/BusinessAuditCard.jsx` | — | 7–9 (import the facade) |
+| `src/components/TestHistoryVault.jsx` | — | 6–8 (import the facade), 206–220 (inline click handler rejects loudly) |
+| `tests/reportExport.test.js` | new, 97 | 3 tests over the real generator |
+| `CHANGELOG.md`, `AGENTS_VERIFICATION.md`, `DEBUGGING_NOTES.md`, `Continued Development Plan.md` | — | this run's entries |
+
+### Verification (verbatim)
+
+`npm run lint`:
+
+```
+> speedreport-org@1.0.0 lint
+> eslint .
+```
+
+`npx vitest run` (full suite, after the change):
+
+```
+ RUN  v5.0.3 /workspace/review/speedreport
+
+ Test Files  15 passed (15)
+      Tests  103 passed (103)
+   Duration  109.92s (environment 63%, import 14%, tests 14%, transform 6%, worker 3%)
+
+    Isolate  15 workers spawned · ~5.17s startup each (spawn + environment, per file)
+```
+
+Before the change the same command produced `13 passed (13) / 95 passed (95)` plus
+the worker-start error above, in 194.46s. Wall clock is down 43% and the file that
+was silently skipped now runs.
+
+`npm test` inside `speedreport-worker`:
+
+```
+> speedreport-edge-engine@1.0.0 test
+> cd .. && npx vitest run tests/worker.test.ts tests/workerHttp.test.ts tests/telemetryIngress.test.ts tests/reporter.test.js
+
+ Test Files  4 passed (4)
+      Tests  38 passed (38)
+   Duration  11.20s (transform 46%, tests 28%, import 22%, worker 4%)
+```
+
+`npx tsc --noEmit` — no output (clean).
+
+`npx wrangler deploy --dry-run`:
+
+```
+✨ Read 11 files from the assets directory /workspace/review/speedreport/dist
+Total Upload: 32.33 KiB / gzip: 8.80 KiB
+Your Worker has access to the following bindings:
+env.TELEMETRY (speedreport_telemetry)                     Analytics Engine Dataset
+env.ASSETS                                                Assets
+env.REPORT_RECIPIENT_TO ("contact@speedreport.org")       Environment Variable
+env.REPORT_RECIPIENT_BCC ("jrellars@gmail.com")           Environment Variable
+
+--dry-run: exiting now.
+```
+
+`npm run build`, before → after the PDF chunk split:
+
+```
+before: dist/assets/index-CydvOYmN.js               896.94 kB │ gzip: 310.18 kB
+after:  dist/assets/index-DXD68h7g.js               435.28 kB │ gzip: 119.74 kB
+        dist/assets/pdfReportGenerator-DkJiUaWs.js  460.59 kB │ gzip: 189.90 kB
+```
+
+`npx vitest run tests/benchmarkUpload.test.js`:
+
+```
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Duration  28.16s
+```
+
+The new slow-uplink test was checked against the old ladder by reverting the
+first rung to 512 KiB and re-running it — it fails, which is what makes it a
+regression test rather than decoration:
+
+```
+ × measures a ~620 kbps uplink that a 512 KiB first rung could only stall on
+AssertionError: expected 524288 to be 262144 // Object.is equality
+ Test Files  1 failed | 8 skipped (9)
+```
+
+`npx vitest run tests/reportExport.test.js`:
+
+```
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Duration  12.55s
+```
+
+### Roadmap audit (Step 4 of the brief)
+
+Items 1–3 of the brief were already shipped by #65/#66/#68 and item 4–5 by
+#69/#70; each was re-read against source rather than assumed:
+
+- `ThroughputCalculator.windowSize` is `1000` (`benchmarkEngine.js:171`).
+- `UPLOAD_CHUNK_LADDER_BYTES` is progressive and `STALL_THRESHOLD_MS` is `6000`;
+  `onLoad` enforces `status >= 200 && status < 300`.
+- `SpeedGauge` renders `PHASE_INDICATORS` with `TESTING LATENCY` / `TESTING
+  DOWNLOAD` / `TESTING UPLOAD` / `TEST COMPLETE` and emerald/cyan/purple accents.
+- `telemetry.ts` signs the raw body with HMAC-SHA256, sends `X-Axim-Signature` +
+  `X-Axim-Timestamp`, buffers failures at `dlq:lead:{testId}` with TTL 86400s and
+  replays them on the next request. The binding is still unbound in
+  `wrangler.jsonc` — operator action, unchanged.
+- `index.ts` exposes `isBlockedRequest()` over decoded path and query, and the
+  `run_worker_first` list routes hostile shapes into it.
+
+So this run advanced the **Next up** queue instead, which is where the remaining
+defects actually are.
+
+---
+
 ## Run: 2026-11-06 — 05:55 EST follow-up to PR #72
 
 - **Repository:** `JimEllars/SpeedReport.org-Speed-Test-App-9642`

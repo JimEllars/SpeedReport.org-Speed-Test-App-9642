@@ -39,6 +39,10 @@ class FakeXHR extends FakeEventTarget {
   static instances = [];
   static plan = 'firefox';
   static latencyMs = 200;
+  // When set, request duration scales with payload size at this rate instead of
+  // using the fixed `latencyMs`. Real links behave this way, and the upload
+  // ladder's size decisions only look sane against a size-proportional model.
+  static bytesPerMs = null;
   static status = 200;
 
   constructor() {
@@ -59,6 +63,9 @@ class FakeXHR extends FakeEventTarget {
   send(payload) {
     this.sent = payload;
     const total = payload.byteLength;
+    const latencyMs = FakeXHR.bytesPerMs
+      ? Math.round(total / FakeXHR.bytesPerMs)
+      : FakeXHR.latencyMs;
 
     const finish = () => {
       if (this.aborted) return;
@@ -80,12 +87,12 @@ class FakeXHR extends FakeEventTarget {
           setTimeout(() => {
             if (this.aborted) return;
             this.upload.dispatch('progress', { loaded: Math.floor(total * fraction), total });
-          }, Math.round(FakeXHR.latencyMs * fraction) - 1);
+          }, Math.round(latencyMs * fraction) - 1);
         });
       }
     }, 0);
 
-    setTimeout(finish, FakeXHR.latencyMs);
+    setTimeout(finish, latencyMs);
   }
 
   abort() {
@@ -186,7 +193,7 @@ describe('measureUpload byte accounting', () => {
 });
 
 describe('measureUpload chunk ladder', () => {
-  const FIRST_RUNG = 512 * 1024;
+  const FIRST_RUNG = 256 * 1024;
 
   beforeEach(() => {
     vi.useFakeTimers({
@@ -194,6 +201,7 @@ describe('measureUpload chunk ladder', () => {
     });
     FakeXHR.instances = [];
     FakeXHR.plan = 'firefox';
+    FakeXHR.bytesPerMs = null;
     FakeXHR.status = 200;
     global.XMLHttpRequest = FakeXHR;
     global.fetch = vi.fn(() => Promise.resolve({ ok: false }));
@@ -204,7 +212,7 @@ describe('measureUpload chunk ladder', () => {
     vi.restoreAllMocks();
   });
 
-  it('starts every stream at 512 KiB', async () => {
+  it('starts every stream at 256 KiB', async () => {
     FakeXHR.latencyMs = 100;
     await runPhase(600);
 
@@ -221,8 +229,8 @@ describe('measureUpload chunk ladder', () => {
   });
 
   it('holds the rung when the next one could not finish before the stall window', async () => {
-    // 2.5s per 512 KiB => a 1 MiB rung projects to 5s, past half the 6s stall
-    // window, so the ladder must stay put instead of tripping the detector.
+    // 2.7s per 256 KiB => a 512 KiB rung projects to 5.4s, past half the 6s
+    // stall window, so the ladder must stay put instead of tripping the detector.
     FakeXHR.latencyMs = Math.round((STALL_THRESHOLD_MS / 2) * 0.9);
     const result = await runPhase(8000);
 
@@ -230,5 +238,21 @@ describe('measureUpload chunk ladder', () => {
     expect(sizes).toEqual([FIRST_RUNG]);
     expect(result.stalled).toBe(false);
     expect(result.bandwidth).toBeGreaterThan(0);
+  });
+
+  it('measures a ~620 kbps uplink that a 512 KiB first rung could only stall on', async () => {
+    // ~620 kbps per stream: 256 KiB takes ~3.4s, so it fits inside the phase
+    // budget, while a 512 KiB first rung would have taken ~6.8s - past the
+    // 6000ms stall floor. Before the 256 KiB rung existed this phase returned
+    // { bandwidth: 0, stalled: true } for a perfectly healthy slow uplink.
+    FakeXHR.bytesPerMs = (256 * 1024) / 3400;
+    const result = await runPhase(11000);
+
+    const sizes = [...new Set(FakeXHR.instances.map((xhr) => xhr.sent.byteLength))];
+    expect(sizes[0]).toBe(FIRST_RUNG);
+    expect(result.stalled).toBe(false);
+    expect(result.bandwidth).toBeGreaterThan(0);
+    // And the reading has to be in the right ballpark, not the window floor.
+    expect(result.bandwidth).toBeLessThan(50);
   });
 });
